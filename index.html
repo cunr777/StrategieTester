@@ -65,9 +65,9 @@
         <input type="date" id="date-end" />
       </div>
       <div class="form-group">
-        <label>Timeframe Override</label>
+        <label>Timeframe erzwingen</label>
         <select id="tf-override">
-          <option value="">Auto (aus Text)</option>
+          <option value="">Auto (aus Text / KI-Wahl)</option>
           <option value="15m">15m</option>
           <option value="1h">1h</option>
           <option value="4h">4h</option>
@@ -185,50 +185,58 @@ function updatePreview() {
   if (!raw) { box.classList.remove('show'); return; }
 
   const p = StrategyParser.parse(raw);
-  let html = '<strong>🔍 Erkannt:</strong> ';
+  const tags = [];
 
-  // Richtung
-  p.directions.forEach(d => {
-    html += `<span class="tag ${d==='long'?'tag-long':'tag-short'}">${d==='long'?'▲ Long':'▼ Short'}</span>`;
-  });
-
-  // Symbole
-  if (p.symbolMode === 'watchlist') {
-    html += `<span class="tag tag-sym">🌐 ${p.symbols.length} Kryptos (Standard-Watchlist)</span>`;
-  } else {
-    p.symbols.forEach(s => { html += `<span class="tag tag-sym">${s}</span>`; });
+  // Richtung — nur wenn explizit genannt
+  if (p.directionExplicit) {
+    p.directions.forEach(d => {
+      tags.push(`<span class="tag ${d==='long'?'tag-long':'tag-short'}">${d==='long'?'▲ Long':'▼ Short'}</span>`);
+    });
   }
 
-  // Timeframe
-  html += `<span class="tag tag-tf">⏱ ${p.timeframe}</span>`;
+  // Symbole — nur wenn explizit genannt
+  if (p.symbolMode === 'specific') {
+    p.symbols.forEach(s => { tags.push(`<span class="tag tag-sym">${s}</span>`); });
+  }
 
-  // Indikatoren
+  // Timeframe — nur wenn explizit genannt
+  if (p.tfExplicit) {
+    tags.push(`<span class="tag tag-tf">⏱ ${p.timeframe}</span>`);
+  }
+
+  // Indikatoren — nur echte (kein fvg/always Fallback anzeigen)
   p.indicatorRules.forEach(r => {
-    if (r.type === 'rsi')      html += `<span class="tag tag-long">RSI ${r.op} ${r.val}</span>`;
-    if (r.type === 'emacross') html += `<span class="tag tag-long">EMA ${r.fast}×${r.slow} Cross</span>`;
-    if (r.type === 'macd')     html += `<span class="tag tag-long">MACD ${r.signal}</span>`;
-    if (r.type === 'bb')       html += `<span class="tag tag-long">BB ${r.touch}</span>`;
-    if (r.type === 'pattern')  html += `<span class="tag tag-long">📍 ${r.pattern}</span>`;
-    if (r.type === 'fvg')      html += `<span class="tag tag-long">🔷 FVG (Preis-Action)</span>`;
-    if (r.type === 'always')   html += `<span class="tag tag-long">⚡ Jede bullish/bearish Kerze</span>`;
+    if (r.type === 'rsi')      tags.push(`<span class="tag tag-long">RSI ${r.op} ${r.val}</span>`);
+    if (r.type === 'emacross') tags.push(`<span class="tag tag-long">EMA ${r.fast}×${r.slow} Cross</span>`);
+    if (r.type === 'macd')     tags.push(`<span class="tag tag-long">MACD ${r.signal}</span>`);
+    if (r.type === 'bb')       tags.push(`<span class="tag tag-long">BB ${r.touch === 'lower' ? 'unten' : 'oben'}</span>`);
+    if (r.type === 'pattern')  tags.push(`<span class="tag tag-long">📍 ${r.pattern}</span>`);
+    // fvg & always: kein Tag — sind interne Fallbacks
   });
 
-  // RR & SL
-  html += `<span class="tag tag-tf">RR 1:${p.rr}</span>`;
+  // SL — nur wenn explizit genannt
   if (p.slMode === 'gap-edge') {
-    html += `<span class="tag tag-tf">📌 SL = Gap-Kante</span>`;
-  } else {
-    html += `<span class="tag tag-tf">SL ${p.slPct ?? 1}%</span>`;
+    tags.push(`<span class="tag tag-tf">📌 SL = Gap-Kante</span>`);
+  } else if (p.slExplicit) {
+    tags.push(`<span class="tag tag-tf">SL ${p.slPct}%</span>`);
   }
+
+  // TP — nur wenn explizit genannt
   if (p.tpPct) {
-    html += `<span class="tag tag-tf">TP ${p.tpPct}%</span>`;
+    tags.push(`<span class="tag tag-tf">TP ${p.tpPct}%</span>`);
   }
 
-  // Warnings
-  p.warnings.forEach(w => { html += `<br><span class="tag tag-warn">⚠ ${w}</span>`; });
-  p.errors.forEach(e =>   { html += `<br><span class="tag tag-err">✖ ${e}</span>`; });
+  // RR — nur wenn explizit genannt
+  if (p.rrExplicit) {
+    tags.push(`<span class="tag tag-tf">RR 1:${p.rr}</span>`);
+  }
 
-  box.innerHTML = html;
+  if (!tags.length) {
+    box.classList.remove('show');
+    return;
+  }
+
+  box.innerHTML = '<strong style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.05em">Erkannt:</strong> ' + tags.join(' ');
   box.classList.add('show');
 }
 
@@ -263,9 +271,9 @@ async function runBacktest() {
     const parsed = StrategyParser.parse(raw);
     updatePreview();
 
-    // Apply overrides
+    // Apply TF override from dropdown
     const tfOverride = document.getElementById('tf-override').value;
-    if (tfOverride) parsed.timeframe = tfOverride;
+    if (tfOverride) { parsed.timeframe = tfOverride; parsed.tfExplicit = true; }
 
     // 2. Date range
     const startDate = new Date(document.getElementById('date-start').value);
@@ -274,17 +282,42 @@ async function runBacktest() {
     const startTime = startDate.getTime();
     const endTime   = endDate.getTime();
 
-    log(`📋 Strategie geparst: ${parsed.symbols.length} Symbol(e), TF=${parsed.timeframe}, RR=1:${parsed.rr}, SL=${parsed.slPct}%`);
+    // 3. Kein Timeframe angegeben → besten automatisch finden
+    let bestKlines, bestTrades, bestKpis, bestTf;
+    if (!parsed.tfExplicit) {
+      log('🔎 Kein Timeframe angegeben — teste 15m / 1h / 4h / 1d automatisch…');
+      const tfCandidates = ['15m', '1h', '4h', '1d'];
+      let bestScore = -Infinity;
 
-    // 3. Daten laden
-    const klines = await Binance.loadAll(parsed.symbols, parsed.timeframe, startTime, endTime, log);
+      for (const tf of tfCandidates) {
+        log(`  → Teste ${tf}…`);
+        parsed.timeframe = tf;
+        const kl = await Binance.loadAll(parsed.symbols, tf, startTime, endTime, () => {});
+        const tr = await BacktestEngine.run(parsed, kl, () => {});
+        const kp = BacktestEngine.calcKPIs(tr);
+        const score = kp.winRate * 0.5 + kp.totalReturn * 0.5;
+        log(`     ${tf}: Win-Rate ${kp.winRate.toFixed(1)}%, Return ${kp.totalReturn.toFixed(1)}%`);
+        if (score > bestScore && kp.trades > 2) {
+          bestScore = score; bestKlines = kl; bestTrades = tr; bestKpis = kp; bestTf = tf;
+        }
+      }
 
-    // 4. Backtest
-    log('⚙️ Backtest läuft…');
-    const trades = await BacktestEngine.run(parsed, klines, log);
-    const kpis   = BacktestEngine.calcKPIs(trades);
+      if (!bestTf) { bestTf = '1h'; parsed.timeframe = '1h'; bestKlines = await Binance.loadAll(parsed.symbols, '1h', startTime, endTime, log); bestTrades = await BacktestEngine.run(parsed, bestKlines, log); bestKpis = BacktestEngine.calcKPIs(bestTrades); }
+      parsed.timeframe = bestTf;
+      log(`✅ Bester Timeframe: ${bestTf} (Win-Rate ${bestKpis.winRate.toFixed(1)}%, Return ${bestKpis.totalReturn.toFixed(1)}%)`);
+    } else {
+      log(`📋 Lade Daten für ${parsed.symbols.length} Symbol(e) auf ${parsed.timeframe}…`);
+      bestKlines = await Binance.loadAll(parsed.symbols, parsed.timeframe, startTime, endTime, log);
+      log('⚙️ Backtest läuft…');
+      bestTrades = await BacktestEngine.run(parsed, bestKlines, log);
+      bestKpis   = BacktestEngine.calcKPIs(bestTrades);
+    }
 
-    log(`✅ Fertig — ${trades.length} Trades gefunden`);
+    const klines = bestKlines;
+    const trades = bestTrades;
+    const kpis   = bestKpis;
+
+    log(`✅ Fertig — ${trades.length} Trades auf ${parsed.timeframe}`);
 
     // 5. Render
     renderKPIs(kpis);

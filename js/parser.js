@@ -97,8 +97,8 @@ const StrategyParser = (() => {
     const dirs = [];
     if (longWords.test(t))  dirs.push('long');
     if (shortWords.test(t)) dirs.push('short');
-    if (!dirs.length) dirs.push('long','short');
-    return [...new Set(dirs)];
+    // Gibt an ob Richtung explizit genannt wurde
+    return { dirs: dirs.length ? [...new Set(dirs)] : ['long','short'], explicit: dirs.length > 0 };
   }
 
   // ── Symbole ────────────────────────────────────────────────────
@@ -332,13 +332,25 @@ const StrategyParser = (() => {
     const t = normalizeText(raw);
     const errors = [], warnings = [];
 
-    const directions = extractDirection(t);
+    const { dirs: directions, explicit: directionExplicit } = extractDirection(t);
     const { symbols, mode } = extractSymbols(raw);
-    const timeframe = extractTimeframe(t);
+
+    // Timeframe: nur explizit erkannt?
+    const tfExplicit = /\b(1m|3m|5m|15m|30m|1h|2h|4h|6h|8h|12h|1d|3d|1w|woechentlich|weekly|taeglich|daily|stunde|hour|minute|min)\b/.test(t);
+    const timeframe = tfExplicit ? extractTimeframe(t) : null; // null = KI wählt automatisch
+
     const slMode = extractSLMode(t);
     const slRaw  = extractSL(t);
     const tpRaw  = extractTP(t);
-    const rr     = extractRR(t);
+    const rrRaw  = (() => {
+      // RR nur explizit wenn direkt genannt
+      const m = t.match(/(?:rr|risk.?reward|r\/r)\s*[=:]?\s*1\s*[:/]\s*(\d+(?:\.\d+)?)/i)
+             || t.match(/\b1\s*(?::|zu|to)\s*(\d+(?:\.\d+)?)\b/i);
+      if (m) return +m[1];
+      if (tpRaw && slRaw && slRaw > 0) return +(tpRaw / slRaw).toFixed(2);
+      return null; // nicht explizit genannt
+    })();
+    const rr = rrRaw ?? 2;
 
     // slPct: wenn gap-edge → null, sonst aus Text oder default 1
     const slPct = slMode === 'gap-edge' ? null : (slRaw ?? 1);
@@ -363,12 +375,16 @@ const StrategyParser = (() => {
 
     return {
       directions,
+      directionExplicit,
       symbols,
       symbolMode: mode,
       timeframe,
+      tfExplicit,
       indicatorRules,
       rr,
+      rrExplicit: rrRaw !== null,
       slPct,
+      slExplicit: slRaw !== null,
       slMode,
       tpPct: tpRaw,
       errors,
