@@ -51,8 +51,7 @@
 • Engulfing-Kerze auf dem 1h Chart → long Entry, SL 1.5%, TP 3%."
     ></textarea>
 
-    <!-- Erkannte Strategie Preview -->
-    <div class="parsed-preview" id="parsed-preview"></div>
+
 
     <!-- Config-Zeile: Zeitraum & Timeframe Override -->
     <div class="config-row">
@@ -171,72 +170,7 @@ if (document.body.classList.contains('light'))
 })();
 
 // ── Live-Preview des Parsers ───────────────────────
-let _parseTimer;
-document.getElementById('strategy-input').addEventListener('input', () => {
-  clearTimeout(_parseTimer);
-  _parseTimer = setTimeout(updatePreview, 600);
-});
 
-function updatePreview() {
-  const raw = document.getElementById('strategy-input').value.trim();
-  const box = document.getElementById('parsed-preview');
-  if (!raw) { box.classList.remove('show'); return; }
-
-  const p = StrategyParser.parse(raw);
-  const tags = [];
-
-  // Richtung — nur wenn explizit genannt
-  if (p.directionExplicit) {
-    p.directions.forEach(d => {
-      tags.push(`<span class="tag ${d==='long'?'tag-long':'tag-short'}">${d==='long'?'▲ Long':'▼ Short'}</span>`);
-    });
-  }
-
-  // Symbole — nur wenn explizit genannt
-  if (p.symbolMode === 'specific') {
-    p.symbols.forEach(s => { tags.push(`<span class="tag tag-sym">${s}</span>`); });
-  }
-
-  // Timeframe — nur wenn explizit genannt
-  if (p.tfExplicit) {
-    tags.push(`<span class="tag tag-tf">⏱ ${p.timeframe}</span>`);
-  }
-
-  // Indikatoren — nur echte (kein fvg/always Fallback anzeigen)
-  p.indicatorRules.forEach(r => {
-    if (r.type === 'rsi')      tags.push(`<span class="tag tag-long">RSI ${r.op} ${r.val}</span>`);
-    if (r.type === 'emacross') tags.push(`<span class="tag tag-long">EMA ${r.fast}×${r.slow} Cross</span>`);
-    if (r.type === 'macd')     tags.push(`<span class="tag tag-long">MACD ${r.signal}</span>`);
-    if (r.type === 'bb')       tags.push(`<span class="tag tag-long">BB ${r.touch === 'lower' ? 'unten' : 'oben'}</span>`);
-    if (r.type === 'pattern')  tags.push(`<span class="tag tag-long">📍 ${r.pattern}</span>`);
-    // fvg & always: kein Tag — sind interne Fallbacks
-  });
-
-  // SL — nur wenn explizit genannt
-  if (p.slMode === 'gap-edge') {
-    tags.push(`<span class="tag tag-tf">📌 SL = Gap-Kante</span>`);
-  } else if (p.slExplicit) {
-    tags.push(`<span class="tag tag-tf">SL ${p.slPct}%</span>`);
-  }
-
-  // TP — nur wenn explizit genannt
-  if (p.tpPct) {
-    tags.push(`<span class="tag tag-tf">TP ${p.tpPct}%</span>`);
-  }
-
-  // RR — nur wenn explizit genannt
-  if (p.rrExplicit) {
-    tags.push(`<span class="tag tag-tf">RR 1:${p.rr}</span>`);
-  }
-
-  if (!tags.length) {
-    box.classList.remove('show');
-    return;
-  }
-
-  box.innerHTML = '<strong style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.05em">Erkannt:</strong> ' + tags.join(' ');
-  box.classList.add('show');
-}
 
 // ── Chart-Instanz ─────────────────────────────────
 let _equityChart = null;
@@ -267,7 +201,6 @@ async function runBacktest() {
   try {
     // 1. Parse
     const parsed = StrategyParser.parse(raw);
-    updatePreview();
 
     // Apply TF override from dropdown
     const tfOverride = document.getElementById('tf-override').value;
