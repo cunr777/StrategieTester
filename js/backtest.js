@@ -334,5 +334,5 @@ const BacktestEngine = (() => {
     return { winRate, totalReturn, trades: trades.length, wins: wins.length, losses: losses.length, open: open.length, curve, avgWin, avgLoss };
   }
 
-  return { run, calcKPIs };
+  return { run, calcKPIs, _generateSignals: generateSignals, _simulateTrades: simulateTrades, _calcGapEdges: calcGapEdges };
 })();

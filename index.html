@@ -115,6 +115,13 @@
       </div>
     </div>
 
+    <!-- Optimierungs-Vorschläge -->
+    <div class="card" id="suggestions-card" style="display:none">
+      <h2><span class="dot" style="background:var(--yellow)"></span>💡 Optimierungsvorschläge</h2>
+      <p style="font-size:12.5px;color:var(--muted);margin-bottom:16px">Der Tester hat automatisch Variationen deiner Strategie getestet. Hier sind die besten Verbesserungen:</p>
+      <div id="suggestions-list"></div>
+    </div>
+
     <!-- Trade-Tabelle -->
     <div class="card">
       <h2><span class="dot"></span>Trade-Historie</h2>
@@ -152,6 +159,7 @@
 <script src="js/parser.js"></script>
 <script src="js/binance.js"></script>
 <script src="js/backtest.js"></script>
+<script src="js/optimizer.js"></script>
 <script>
 
 // ── Theme ──────────────────────────────────────────
@@ -250,8 +258,9 @@ async function runBacktest() {
   if (!raw) { alert('Bitte zuerst eine Strategie eingeben!'); return; }
 
   // Reset UI
-  document.getElementById('empty-state').style.display  = 'none';
+  document.getElementById('empty-state').style.display    = 'none';
   document.getElementById('results-section').style.display = 'none';
+  document.getElementById('suggestions-card').style.display = 'none';
   document.getElementById('log-box').innerHTML = '';
   document.getElementById('log-box').classList.remove('show');
   document.getElementById('spinner').classList.add('show');
@@ -292,8 +301,16 @@ async function runBacktest() {
     renderKPIs(kpis);
     renderChart(kpis.curve);
     renderTable(trades);
-
     document.getElementById('results-section').style.display = 'flex';
+
+    // 6. Optimierung im Hintergrund
+    if (trades.length > 0) {
+      log('🔍 Optimierungsvorschläge werden berechnet…');
+      StrategyOptimizer.optimize(parsed, klines, kpis, log).then(suggestions => {
+        renderSuggestions(suggestions, kpis);
+        log(`✅ ${suggestions.length} Vorschlag/-schläge gefunden`);
+      }).catch(() => {});
+    }
 
   } catch(err) {
     log(`❌ Fehler: ${err.message}`);
@@ -368,6 +385,51 @@ function renderChart(curve) {
       }
     }
   });
+}
+
+// ── Vorschläge-Renderer ────────────────
+function renderSuggestions(suggestions, baseKPIs) {
+  const card = document.getElementById('suggestions-card');
+  const list = document.getElementById('suggestions-list');
+
+  if (!suggestions.length) {
+    list.innerHTML = '<div class="no-suggestions">🎉 Deine Strategie ist bereits gut optimiert — keine besseren Variationen gefunden.</div>';
+    card.style.display = 'block';
+    return;
+  }
+
+  const medals = ['🥇','🥈','🥉','4.','5.'];
+  const fmtDelta = (val, unit = '%', invert = false) => {
+    const sign = val >= 0 ? '+' : '';
+    const cls  = (val >= 0) !== invert ? 'pos' : 'neg';
+    return `<span class="delta-badge ${cls}">${sign}${val.toFixed(2)}${unit}</span>`;
+  };
+  const fmtAbs = (val, unit = '%') => {
+    const cls = val >= 0 ? 'green' : 'red';
+    return `<span class="kpi-big ${cls}">${val >= 0 ? '+' : ''}${val.toFixed(2)}${unit}</span>`;
+  };
+
+  list.innerHTML = suggestions.map((s, i) => `
+    <div class="suggestion-item">
+      <div>
+        <div class="suggestion-label">${medals[i]} ${s.label}</div>
+        <div class="suggestion-hint">${s.hint}</div>
+        <div class="suggestion-deltas">
+          ${fmtDelta(s.deltaWinRate, '% Win-Rate')}
+          ${fmtDelta(s.deltaReturn,  '% Return')}
+          <span class="delta-badge neu">${s.kpis.trades} Trades</span>
+        </div>
+      </div>
+      <div class="suggestion-kpis">
+        ${fmtAbs(s.kpis.totalReturn)}
+        <div class="kpi-sub">Return</div>
+        <div style="margin-top:6px;font-size:13px;font-weight:600;color:${s.kpis.winRate>=50?'var(--accent)':'var(--red)'}">${s.kpis.winRate.toFixed(1)}% WR</div>
+        <div class="kpi-sub">Win-Rate</div>
+      </div>
+    </div>
+  `).join('');
+
+  card.style.display = 'block';
 }
 
 // ── Tabellen-Renderer ─────────────────────────────
