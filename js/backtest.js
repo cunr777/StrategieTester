@@ -199,7 +199,7 @@ const BacktestEngine = (() => {
 
   // ── Trade-Simulation ───────────────────────────────────────────
 
-  function simulateTrades(candles, signals, slPct, rrRatio, slMode, gapEdges) {
+  function simulateTrades(candles, signals, slPct, rrRatio, slMode, gapEdges, parsed) {
     const trades = [];
     let inTrade = false;
 
@@ -213,7 +213,7 @@ const BacktestEngine = (() => {
       // SL: entweder Gap-Kante oder Prozent
       let sl;
       if (slMode === 'gap-edge' && gapEdges && gapEdges[i] != null) {
-        sl = gapEdges[i]; // tatsächliche FVG-Kante
+        sl = gapEdges[i];
       } else {
         const pct = slPct != null ? slPct : 1;
         sl = dir === 'long'
@@ -221,9 +221,17 @@ const BacktestEngine = (() => {
           : entry * (1 + pct / 100);
       }
 
-      const tp     = dir === 'long'
-        ? entry + (entry - sl) * rrRatio
-        : entry - (sl - entry) * rrRatio;
+      // TP: entweder direkt aus tpPct oder via RR-Ratio
+      let tp;
+      if (parsed && parsed.tpPct) {
+        tp = dir === 'long'
+          ? entry * (1 + parsed.tpPct / 100)
+          : entry * (1 - parsed.tpPct / 100);
+      } else {
+        tp = dir === 'long'
+          ? entry + (entry - sl) * rrRatio
+          : entry - (sl - entry) * rrRatio;
+      }
 
       const entryTime = candles[i + 1].time;
       let   result    = null, exitPrice = null, exitTime = null;
@@ -293,7 +301,7 @@ const BacktestEngine = (() => {
         ? calcGapEdges(data, parsed.directions)
         : null;
 
-      const trades = simulateTrades(data, combinedSignals, parsed.slPct, parsed.rr, parsed.slMode, gapEdges);
+      const trades = simulateTrades(data, combinedSignals, parsed.slPct, parsed.rr, parsed.slMode, gapEdges, parsed);
       trades.forEach(t => { t.symbol = sym; });
       allTrades.push(...trades);
     }

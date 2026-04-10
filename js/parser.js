@@ -1,42 +1,49 @@
 /**
- * StrategyParser — wandelt Freitext in Handelsregeln um.
- *
- * Erkannte Muster:
- *  - Richtung:  long / short / buy / sell / bullish / bearish / kaufen / verkaufen
- *  - Indikatoren: RSI, MACD, EMA, SMA, Bollinger
- *  - Candlestick-Muster: hammer, engulfing, doji, marubozu, pinbar
- *  - Währungen: z.B. "Bitcoin", "ETH", "SOLUSDT", "alle Kryptos", "altcoins"
- *  - Timeframe: 1m,5m,15m,1h,4h,1d,1w
- *  - Klartext-Zahlen: z.B. "RSI unter 30" oder "EMA 50 kreuzt EMA 200"
+ * StrategyParser v2 — vollständige Freitext-Analyse.
+ * Liest ALLES aus dem Text: Bedingungen, Zahlen, Symbole, Richtungen, RR/SL/TP.
+ * Kein starres Stichwort-Matching — kontextuelle Extraktion.
  */
 const StrategyParser = (() => {
 
   // ── Symbol-Mapping ────────────────────────────────────────────
   const COIN_MAP = {
-    bitcoin:   'BTCUSDT', btc: 'BTCUSDT',
-    ethereum:  'ETHUSDT', eth: 'ETHUSDT',
-    solana:    'SOLUSDT', sol: 'SOLUSDT',
-    bnb:       'BNBUSDT', binance: 'BNBUSDT',
-    xrp:       'XRPUSDT', ripple: 'XRPUSDT',
-    cardano:   'ADAUSDT', ada: 'ADAUSDT',
-    dogecoin:  'DOGEUSDT', doge: 'DOGEUSDT',
+    bitcoin: 'BTCUSDT', btc: 'BTCUSDT',
+    ethereum: 'ETHUSDT', eth: 'ETHUSDT',
+    solana: 'SOLUSDT', sol: 'SOLUSDT',
+    bnb: 'BNBUSDT', binance: 'BNBUSDT',
+    xrp: 'XRPUSDT', ripple: 'XRPUSDT',
+    cardano: 'ADAUSDT', ada: 'ADAUSDT',
+    dogecoin: 'DOGEUSDT', doge: 'DOGEUSDT',
     avalanche: 'AVAXUSDT', avax: 'AVAXUSDT',
-    polkadot:  'DOTUSDT', dot: 'DOTUSDT',
+    polkadot: 'DOTUSDT', dot: 'DOTUSDT',
     chainlink: 'LINKUSDT', link: 'LINKUSDT',
-    polygon:   'MATICUSDT', matic: 'MATICUSDT', pol: 'POLUSDT',
-    litecoin:  'LTCUSDT', ltc: 'LTCUSDT',
-    uniswap:   'UNIUSDT', uni: 'UNIUSDT',
-    pepe:      'PEPEUSDT',
-    shib:      'SHIBUSDT', shiba: 'SHIBUSDT',
-    near:      'NEARUSDT',
-    atom:      'ATOMUSDT', cosmos: 'ATOMUSDT',
-    filecoin:  'FILUSDT', fil: 'FILUSDT',
-    aave:      'AAVEUSDT',
-    sui:       'SUIUSDT',
-    aptos:     'APTUSDT', apt: 'APTUSDT',
-    arbitrum:  'ARBUSDT', arb: 'ARBUSDT',
-    optimism:  'OPUSDT', op: 'OPUSDT',
+    polygon: 'MATICUSDT', matic: 'MATICUSDT',
+    litecoin: 'LTCUSDT', ltc: 'LTCUSDT',
+    uniswap: 'UNIUSDT', uni: 'UNIUSDT',
+    pepe: 'PEPEUSDT',
+    shib: 'SHIBUSDT', shiba: 'SHIBUSDT',
+    near: 'NEARUSDT',
+    atom: 'ATOMUSDT', cosmos: 'ATOMUSDT',
+    filecoin: 'FILUSDT', fil: 'FILUSDT',
+    aave: 'AAVEUSDT',
+    sui: 'SUIUSDT',
+    aptos: 'APTUSDT', apt: 'APTUSDT',
+    arbitrum: 'ARBUSDT', arb: 'ARBUSDT',
+    optimism: 'OPUSDT', op: 'OPUSDT',
     injective: 'INJUSDT', inj: 'INJUSDT',
+    ton: 'TONUSDT',
+    trx: 'TRXUSDT', tron: 'TRXUSDT',
+    ftm: 'FTMUSDT', fantom: 'FTMUSDT',
+    hbar: 'HBARUSDT', hedera: 'HBARUSDT',
+    ldo: 'LDOUSDT', lido: 'LDOUSDT',
+    stx: 'STXUSDT', stacks: 'STXUSDT',
+    grt: 'GRTUSDT', graph: 'GRTUSDT',
+    mkr: 'MKRUSDT', maker: 'MKRUSDT',
+    snx: 'SNXUSDT', synthetix: 'SNXUSDT',
+    imx: 'IMXUSDT', immutable: 'IMXUSDT',
+    sei: 'SEIUSDT',
+    blur: 'BLURUSDT',
+    wld: 'WLDUSDT', worldcoin: 'WLDUSDT',
   };
 
   const DEFAULT_WATCHLIST = [
@@ -44,52 +51,62 @@ const StrategyParser = (() => {
     'ADAUSDT','DOGEUSDT','AVAXUSDT','DOTUSDT','LINKUSDT'
   ];
 
-  // ── Timeframe-Mapping ─────────────────────────────────────────
-  const TF_MAP = {
-    '1 minute': '1m', '1min': '1m', '1 min': '1m',
-    '5 minute': '5m', '5min': '5m', '5 min': '5m',
-    '15 minute':'15m','15min':'15m','15 min':'15m',
-    '30 minute':'30m','30min':'30m','30 min':'30m',
-    '1 hour':   '1h', '1h': '1h', 'hourly': '1h', 'stunde':'1h', 'stündlich':'1h',
-    '4 hour':   '4h', '4h': '4h',
-    'daily':    '1d', '1 day': '1d', 'täglich':'1d', 'tag':'1d',
-    'weekly':   '1w', '1 week':'1w', 'woche':'1w', 'wöchentlich':'1w',
+  // ── Normalisierung ────────────────────────────────────────────
+  // Ziffern-Wörter (deutsch & englisch) → Zahlen
+  const NUM_WORDS = {
+    null:0, nul:0, zero:0,
+    ein:1, eine:1, eins:1, one:1,
+    zwei:2, two:2,
+    drei:3, three:3,
+    vier:4, four:4,
+    fünf:5, funf:5, five:5,
+    sechs:6, six:6,
+    sieben:7, seven:7,
+    acht:8, eight:8,
+    neun:9, nine:9,
+    zehn:10, ten:10,
+    zwanzig:20, twenty:20,
+    dreißig:30, dreissig:30, thirty:30,
+    vierzig:40, forty:40,
+    fünfzig:50, funfzig:50, fifty:50,
+    sechzig:60, sixty:60,
+    siebzig:70, seventy:70,
+    achtzig:80, eighty:80,
+    neunzig:90, ninety:90,
+    hundert:100, hundred:100,
+    zweihundert:200,
   };
 
-  // ── Indikator-Definitionen ─────────────────────────────────────
-  const INDICATORS = {
-    rsi:  { name: 'RSI',  params: ['period'], defaultPeriod: 14 },
-    macd: { name: 'MACD', params: ['fast','slow','signal'], defaultFast:12, defaultSlow:26, defaultSignal:9 },
-    ema:  { name: 'EMA',  params: ['period'], defaultPeriod: 20 },
-    sma:  { name: 'SMA',  params: ['period'], defaultPeriod: 20 },
-    bb:   { name: 'Bollinger Bands', params: ['period','mult'], defaultPeriod:20, defaultMult:2 },
-  };
+  function normalizeText(raw) {
+    let t = raw.toLowerCase();
+    // Umlaute
+    t = t.replace(/ü/g,'ue').replace(/ö/g,'oe').replace(/ä/g,'ae').replace(/ß/g,'ss');
+    // Ziffern-Wörter ersetzen
+    for (const [word, num] of Object.entries(NUM_WORDS)) {
+      t = t.replace(new RegExp(`\\b${word}\\b`, 'g'), String(num));
+    }
+    // Komma als Dezimalpunkt
+    t = t.replace(/(\d),(\d)/g, '$1.$2');
+    return t;
+  }
 
-  // ── Candlestick-Muster ─────────────────────────────────────────
-  const PATTERNS = ['hammer','doji','engulfing','marubozu','pinbar','shooting star','morning star','evening star'];
-
-  // ── Hilfsfunktionen ───────────────────────────────────────────
-  const txt = t => t.toLowerCase().replace(/[^a-zäöü0-9\s%:.\/]/g, ' ');
-
+  // ── Richtung ───────────────────────────────────────────────────
   function extractDirection(t) {
+    const longWords  = /\b(long|buy|bull|kaufen?|kauf|aufwaerts|steigen?|rauf|green candle|call)\b/;
+    const shortWords = /\b(short|sell|bear|verkaufen?|verkauf|abwaerts|fallen?|runter|red candle|put)\b/;
     const dirs = [];
-    if (/\b(long|buy|bullish|kaufen|kauf|aufwärts|green candle)\b/.test(t)) dirs.push('long');
-    if (/\b(short|sell|bearish|verkaufen|verkauf|abwärts|red candle)\b/.test(t)) dirs.push('short');
-    if (dirs.length === 0) dirs.push('long','short'); // both if unspecified
+    if (longWords.test(t))  dirs.push('long');
+    if (shortWords.test(t)) dirs.push('short');
+    if (!dirs.length) dirs.push('long','short');
     return [...new Set(dirs)];
   }
 
+  // ── Symbole ────────────────────────────────────────────────────
   function extractSymbols(raw) {
-    const t = txt(raw);
+    const t = normalizeText(raw);
     const found = [];
 
-    // Check explicit coin names
-    for (const [key, sym] of Object.entries(COIN_MAP)) {
-      const re = new RegExp(`\\b${key}\\b`);
-      if (re.test(t) && !found.includes(sym)) found.push(sym);
-    }
-
-    // Check raw USDT/BTC pairs like "ETHUSDT", "ethbtc"
+    // Explizite USDT-Pairs (z.B. "ETHUSDT", "ethusdt")
     const pairRe = /\b([a-z]{2,8}usdt)\b/g;
     let m;
     while ((m = pairRe.exec(t)) !== null) {
@@ -97,130 +114,236 @@ const StrategyParser = (() => {
       if (!found.includes(sym)) found.push(sym);
     }
 
-    // Keywords for "all crypto"
-    if (/\b(alle|all|altcoin|altcoins|kryptos?|crypto|coins?|watchlist|standard)\b/.test(t) && found.length === 0) {
+    // Coin-Namen
+    for (const [key, sym] of Object.entries(COIN_MAP)) {
+      if (new RegExp(`\\b${key}\\b`).test(t) && !found.includes(sym)) {
+        found.push(sym);
+      }
+    }
+
+    // "alle", "altcoins", "kryptos", "watchlist", "coins"
+    const allKeywords = /\b(alle|all|altcoins?|kryptos?|crypto|coins?|watchlist|standard|portfolio)\b/;
+    if (allKeywords.test(t) && found.length === 0) {
       return { symbols: DEFAULT_WATCHLIST, mode: 'watchlist' };
     }
 
-    if (found.length === 0) return { symbols: DEFAULT_WATCHLIST, mode: 'watchlist' };
+    if (!found.length) return { symbols: DEFAULT_WATCHLIST, mode: 'watchlist' };
     return { symbols: found, mode: 'specific' };
   }
 
+  // ── Timeframe ──────────────────────────────────────────────────
   function extractTimeframe(t) {
-    // First try explicit labels
-    for (const [key, val] of Object.entries(TF_MAP)) {
-      if (t.includes(key)) return val;
-    }
-    // Regex for "4h" / "1d" patterns
+    // Explizite TF-Kürzel
     const m = t.match(/\b(1m|3m|5m|15m|30m|1h|2h|4h|6h|8h|12h|1d|3d|1w)\b/);
     if (m) return m[1];
+
+    // Wort-Varianten
+    if (/\b(woechentlich|weekly|1\s*woche|1\s*week)\b/.test(t)) return '1w';
+    if (/\b(taeglich|daily|1\s*tag|1\s*day)\b/.test(t))         return '1d';
+    if (/\b(4\s*stunde|4\s*hour|vier\s*stunde)\b/.test(t))      return '4h';
+    if (/\b(1\s*stunde|1\s*hour|stündlich|hourly)\b/.test(t))   return '1h';
+    if (/\b(15\s*min)\b/.test(t))                                return '15m';
+    if (/\b(5\s*min)\b/.test(t))                                 return '5m';
+
     return '1h'; // default
   }
 
+  // ── Zahlen-Extraktor (Kontext-basiert) ────────────────────────
+  // Sucht nach "SCHLÜSSELWORT [Vergleich] ZAHL" oder "ZAHL [Vergleich] SCHLÜSSELWORT"
+  function findNumber(t, keyword, defaultVal = null) {
+    const ops = '(?:unter|below|kleiner|<|ueberverkauft|oversold|ueber|above|groesser|>|ueberkauft|overbought|=|bei|at|on|of|period|periode|laenge)?';
+    const re = new RegExp(`${keyword}\\s*${ops}\\s*(\\d+(?:\\.\\d+)?)`, 'i');
+    const re2 = new RegExp(`(\\d+(?:\\.\\d+)?)\\s*(?:er|period)?\\s*${keyword}`, 'i');
+    const m = t.match(re) || t.match(re2);
+    return m ? +m[1] : defaultVal;
+  }
+
+  function findOperator(t, keyword) {
+    const re = new RegExp(`${keyword}\\s*(unter|below|kleiner als?|<|ueber|above|groesser als?|>)`, 'i');
+    const m = t.match(re);
+    if (!m) {
+      // Kontext: "oversold"/"ueberverkauft" → <, "overbought"/"ueberkauft" → >
+      if (/oversold|ueberverkauft|unten|unten|tief/.test(t)) return '<';
+      if (/overbought|ueberkauft|hoch|oben/.test(t)) return '>';
+      return '<'; // default
+    }
+    return /unter|below|kleiner|</.test(m[1]) ? '<' : '>';
+  }
+
+  // ── RSI ────────────────────────────────────────────────────────
   function extractRSI(t) {
+    if (!/\brsi\b/.test(t)) return [];
     const rules = [];
-    // RSI < X → oversold → long signal
-    const re1 = /rsi\s*(?:unter|below|<|kleiner|oversold|überverkauft)?\s*(\d{1,3})/g;
-    const re2 = /rsi\s*(?:über|above|>|größer|overbought|überkauft)?\s*(\d{1,3})/g;
+
+    // Alle RSI-Bedingungen im Text suchen
+    const re = /rsi\s*(?:(?:unter|below|<|kleiner)\s*(\d+)|(?:ueber|above|>|groesser)\s*(\d+)|(\d+))/gi;
     let m;
-    while ((m = re1.exec(t)) !== null) {
-      rules.push({ type:'rsi', op:'<', val: +m[1], signal: 'long' });
+    while ((m = re.exec(t)) !== null) {
+      if (m[1]) rules.push({ type:'rsi', op:'<', val:+m[1], signal:'long',  period:14 });
+      if (m[2]) rules.push({ type:'rsi', op:'>', val:+m[2], signal:'short', period:14 });
+      if (m[3]) {
+        const val = +m[3];
+        const op = findOperator(t, 'rsi');
+        rules.push({ type:'rsi', op, val, signal: op === '<' ? 'long' : 'short', period:14 });
+      }
     }
-    while ((m = re2.exec(t)) !== null) {
-      rules.push({ type:'rsi', op:'>', val: +m[1], signal: 'short' });
+
+    // "RSI oversold" ohne Zahl
+    if (!rules.length) {
+      if (/oversold|ueberverkauft/.test(t)) rules.push({ type:'rsi', op:'<', val:30, signal:'long',  period:14 });
+      if (/overbought|ueberkauft/.test(t))  rules.push({ type:'rsi', op:'>', val:70, signal:'short', period:14 });
     }
-    // Fallback pattern: "RSI oversold" → < 30
-    if (!rules.length && /rsi/.test(t)) {
-      if (/oversold|überverkauft|unter/.test(t)) rules.push({ type:'rsi', op:'<', val:30, signal:'long' });
-      if (/overbought|überkauft|über/.test(t))   rules.push({ type:'rsi', op:'>', val:70, signal:'short' });
-    }
+
+    // RSI-Periode aus dem Text (z.B. "RSI(14)", "14er RSI")
+    const perM = t.match(/rsi\s*\(?\s*(\d+)\s*\)?/) || t.match(/(\d+)\s*(?:er|period)?\s*rsi/);
+    if (perM) rules.forEach(r => r.period = +perM[1]);
+
     return rules;
   }
 
+  // ── EMA / SMA ──────────────────────────────────────────────────
   function extractEMACross(t) {
     const rules = [];
-    // "EMA 50 kreuzt EMA 200 von unten"
-    const re = /ema\s*(\d+)\s*(?:kreuzt|crosses?|over|unter|cross)\s*(?:ema\s*)?(\d+)/g;
+    // "EMA 50 kreuzt EMA 200", "50er EMA über 200er EMA", "EMA(50) crosses EMA(200)"
+    const re = /(?:ema|sma)\s*\(?\s*(\d+)\s*\)?\s*(?:kreuzt?|crosses?|schneidet?|ueber|above|unter|below)\s*(?:ema|sma)?\s*\(?\s*(\d+)\s*\)?/gi;
     let m;
     while ((m = re.exec(t)) !== null) {
       const fast = +m[1], slow = +m[2];
-      const isBull = /von unten|crosses? (up|above)|golden cross/.test(t);
-      rules.push({ type:'emacross', fast, slow, signal: isBull ? 'long' : 'short' });
+      const bullish = /von unten|crosses?\s*(up|above)|golden cross|aufwaerts|ueber/.test(t);
+      const bearish = /von oben|crosses?\s*(down|below)|death cross|abwaerts|unter/.test(t);
+      if (bullish) rules.push({ type:'emacross', fast, slow, signal:'long' });
+      else if (bearish) rules.push({ type:'emacross', fast, slow, signal:'short' });
+      else { // Richtung unbekannt → beide
+        rules.push({ type:'emacross', fast, slow, signal:'long' });
+        rules.push({ type:'emacross', fast, slow, signal:'short' });
+      }
     }
-    // Golden/Death cross shortcut
-    if (/golden cross/.test(t)) rules.push({ type:'emacross', fast:50, slow:200, signal:'long' });
-    if (/death cross/.test(t))  rules.push({ type:'emacross', fast:50, slow:200, signal:'short' });
+    // Shortcuts
+    if (/golden\s*cross/.test(t)) rules.push({ type:'emacross', fast:50, slow:200, signal:'long' });
+    if (/death\s*cross/.test(t))  rules.push({ type:'emacross', fast:50, slow:200, signal:'short' });
     return rules;
   }
 
+  // ── MACD ────────────────────────────────────────────────────────
   function extractMACD(t) {
+    if (!/\bmacd\b/.test(t)) return [];
     const rules = [];
-    if (!(/macd/.test(t))) return rules;
-    if (/bullish|long|buy|kaufen|positiv|kreuz(?:t|ung)? (?:nach )?oben|crosses? (up|above)/.test(t))
+    const isBull = /bull|long|buy|kaufen?|positiv|ueber null|kreuz.*oben|crosses?\s*(up|above)|histogram.*positiv/.test(t);
+    const isBear = /bear|short|sell|verkaufen?|negativ|unter null|kreuz.*unten|crosses?\s*(down|below)|histogram.*negativ/.test(t);
+    if (isBull) rules.push({ type:'macd', signal:'long' });
+    if (isBear) rules.push({ type:'macd', signal:'short' });
+    if (!rules.length) { // MACD erwähnt, Richtung unklar → beide
       rules.push({ type:'macd', signal:'long' });
-    if (/bearish|short|sell|verkaufen|negativ|kreuz(?:t|ung)? (?:nach )?unten|crosses? (down|below)/.test(t))
       rules.push({ type:'macd', signal:'short' });
-    if (!rules.length) rules.push({ type:'macd', signal:'long' }); // ambiguous → long
+    }
+    // Optionale Periode (z.B. "MACD 12 26 9")
+    const perM = t.match(/macd\s+(\d+)\s+(\d+)\s+(\d+)/);
+    if (perM) rules.forEach(r => { r.fast=+perM[1]; r.slow=+perM[2]; r.sig=+perM[3]; });
     return rules;
   }
 
+  // ── Bollinger Bands ─────────────────────────────────────────────
   function extractBollinger(t) {
+    if (!/\b(bollinger|bband|bb)\b/.test(t)) return [];
     const rules = [];
-    if (!(/bollinger|bb/.test(t))) return rules;
-    if (/unter(?:es)?|lower band|unten/.test(t)) rules.push({ type:'bb', touch:'lower', signal:'long' });
-    if (/ober(?:es)?|upper band|oben/.test(t))   rules.push({ type:'bb', touch:'upper', signal:'short' });
+    const lower = /unten|lower|unteres?|unterschreitet?|unten berührt?|touches?\s*lower|break.*unten/.test(t);
+    const upper = /oben|upper|oberes?|ueberschreitet?|oben berührt?|touches?\s*upper|break.*oben/.test(t);
+    if (lower) rules.push({ type:'bb', touch:'lower', signal:'long',  period:20, mult:2 });
+    if (upper) rules.push({ type:'bb', touch:'upper', signal:'short', period:20, mult:2 });
+    if (!rules.length) { rules.push({ type:'bb', touch:'lower', signal:'long', period:20, mult:2 }); }
+    // Periode aus Text (z.B. "BB(20,2)")
+    const perM = t.match(/(?:bb|bollinger)\s*\(?\s*(\d+)\s*(?:,\s*(\d+(?:\.\d+)?))?\s*\)?/);
+    if (perM) rules.forEach(r => { r.period = +perM[1]; if (perM[2]) r.mult = +perM[2]; });
     return rules;
   }
+
+  // ── Candlestick-Muster ─────────────────────────────────────────
+  const PATTERN_MAP = {
+    'hammer':        { signal:'long'  },
+    'inverted hammer': { signal:'long' },
+    'doji':          { signal:'both'  },
+    'engulfing':     { signal:'both'  },
+    'bullish engulfing': { signal:'long' },
+    'bearish engulfing': { signal:'short' },
+    'marubozu':      { signal:'both'  },
+    'pinbar':        { signal:'both'  },
+    'pin bar':       { signal:'both'  },
+    'shooting star': { signal:'short' },
+    'morning star':  { signal:'long'  },
+    'evening star':  { signal:'short' },
+    'three white soldiers': { signal:'long' },
+    'three black crows':    { signal:'short' },
+    'inside bar':    { signal:'both'  },
+    'outside bar':   { signal:'both'  },
+    'tweezer':       { signal:'both'  },
+  };
 
   function extractPatterns(t) {
     const rules = [];
-    for (const p of PATTERNS) {
-      if (t.includes(p)) rules.push({ type:'pattern', pattern:p });
+    for (const [pat, meta] of Object.entries(PATTERN_MAP)) {
+      if (t.includes(pat)) {
+        rules.push({ type:'pattern', pattern:pat, signal:meta.signal });
+      }
     }
     return rules;
   }
 
-  function extractRR(raw) {
-    // "1:3", "Risk Reward 1 zu 2", "TP 2%"
-    const m = raw.match(/(?:rr|risk.?reward|rr-ratio)\s*[=:]\s*1\s*[:/]\s*(\d+(?:\.\d+)?)/i)
-             || raw.match(/1\s*:\s*(\d+(?:\.\d+)?)/);
-    if (m) return +m[1];
-    // TP percentage
-    const tp = raw.match(/tp\s*[=:]?\s*(\d+(?:\.\d+)?)%/i);
-    if (tp) return +tp[1];
-    return 2; // default 1:2
-  }
-
-  function extractSLMode(raw) {
-    const t = raw.toLowerCase();
-    // "SL an die Kante", "Stop an Gap-Kante", "SL at gap edge", "Kante des Gaps", "gap edge", "untere Kante", "obere Kante"
-    if (/sl\s*(an|at|auf)\s*(die|the|der)?\s*(kante|edge|rand|grenze)/.test(t)) return 'gap-edge';
-    if (/(kante|edge|rand)\s*(des|of|vom)?\s*(gap|fvg|lücke)/.test(t))         return 'gap-edge';
-    if (/stop\s*(an|at|auf)\s*(die|the|der)?\s*(kante|edge)/.test(t))            return 'gap-edge';
-    if (/sl\s*(=|:)?\s*(gap|fvg|lücke)/.test(t))                               return 'gap-edge';
+  // ── SL-Modus ───────────────────────────────────────────────────
+  function extractSLMode(t) {
+    if (/sl\s*(an|at|auf|=)\s*(die|the|der)?\s*(kante|edge|rand|grenze)/.test(t)) return 'gap-edge';
+    if (/(kante|edge|rand)\s*(des|of|vom)?\s*(gap|fvg|luecke)/.test(t))           return 'gap-edge';
+    if (/stop\s*(an|at)\s*(die|the|der)?\s*(kante|edge)/.test(t))                 return 'gap-edge';
+    if (/sl\s*=?\s*(gap|fvg|luecke)/.test(t))                                     return 'gap-edge';
     return 'percent';
   }
 
-  function extractSL(raw) {
-    const m = raw.match(/sl\s*[=:]?\s*(\d+(?:\.\d+)?)%/i)
-             || raw.match(/stop[\s-]?loss\s*[=:]?\s*(\d+(?:\.\d+)?)%/i);
+  // ── SL / TP / RR ─────────────────────────────────────────────
+  function extractSL(t) {
+    // "SL 1%", "Stop Loss 2%", "stop 0.5%", "1.5% SL"
+    const m = t.match(/(?:sl|stop[\s-]?loss|stop)\s*[=:]?\s*(\d+(?:\.\d+)?)\s*%/)
+           || t.match(/(\d+(?:\.\d+)?)\s*%\s*(?:sl|stop[\s-]?loss|stop)/);
     if (m) return +m[1];
-    return 1; // default 1%
+    return null; // default wird unten gesetzt
   }
 
-  // ── Main parse() ──────────────────────────────────────────────
+  function extractTP(t) {
+    // "TP 3%", "take profit 5%", "3% TP"
+    const m = t.match(/(?:tp|take[\s-]?profit|ziel)\s*[=:]?\s*(\d+(?:\.\d+)?)\s*%/)
+           || t.match(/(\d+(?:\.\d+)?)\s*%\s*(?:tp|take[\s-]?profit)/);
+    return m ? +m[1] : null;
+  }
+
+  function extractRR(t) {
+    // "1:3", "RR 1:3", "Risk Reward 1 zu 2", "1 zu 3"
+    const m = t.match(/(?:rr|risk.?reward|r\/r|rr\s*ratio)\s*[=:]?\s*1\s*[:/]\s*(\d+(?:\.\d+)?)/i)
+           || t.match(/\b1\s*(?::|zu|to)\s*(\d+(?:\.\d+)?)\b/i);
+    if (m) return +m[1];
+
+    // TP% / SL% → RR berechnen
+    const tp = extractTP(t);
+    const sl = extractSL(t);
+    if (tp && sl && sl > 0) return +(tp / sl).toFixed(2);
+
+    return 2; // default
+  }
+
+  // ── Haupt-Parse ────────────────────────────────────────────────
   function parse(raw) {
-    const t = txt(raw);
-    const errors = [];
-    const warnings = [];
+    const t = normalizeText(raw);
+    const errors = [], warnings = [];
 
     const directions = extractDirection(t);
     const { symbols, mode } = extractSymbols(raw);
     const timeframe = extractTimeframe(t);
-    const rr = extractRR(raw);
-    const slMode = extractSLMode(raw);
-    const slPct = slMode === 'gap-edge' ? null : extractSL(raw);
+    const slMode = extractSLMode(t);
+    const slRaw  = extractSL(t);
+    const tpRaw  = extractTP(t);
+    const rr     = extractRR(t);
 
+    // slPct: wenn gap-edge → null, sonst aus Text oder default 1
+    const slPct = slMode === 'gap-edge' ? null : (slRaw ?? 1);
+
+    // Alle Indikator-Regeln sammeln
     const indicatorRules = [
       ...extractRSI(t),
       ...extractEMACross(t),
@@ -229,13 +352,12 @@ const StrategyParser = (() => {
       ...extractPatterns(t),
     ];
 
-    // Kein Indikator → FVG / Preis-Action als Standard (kein Fehler)
+    // Kein Indikator → Preis-Action / FVG
     if (indicatorRules.length === 0) {
-      // Explizit Preis-Action / simple entry?
-      if (/\b(preis.?action|price.?action|breakout|ausbruch|momentum|trend|immer|always|every|jede)\b/.test(t)) {
-        indicatorRules.push({ type: 'always', signal: directions[0] });
+      if (/\b(price.?action|preis.?action|pa|breakout|ausbruch|momentum|trend)\b/.test(t)) {
+        indicatorRules.push({ type:'always', signal: directions[0] });
       } else {
-        indicatorRules.push({ type: 'fvg', signal: directions[0] });
+        indicatorRules.push({ type:'fvg', signal: directions[0] });
       }
     }
 
@@ -248,6 +370,7 @@ const StrategyParser = (() => {
       rr,
       slPct,
       slMode,
+      tpPct: tpRaw,
       errors,
       warnings,
       raw,

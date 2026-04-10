@@ -218,7 +218,10 @@ function updatePreview() {
   if (p.slMode === 'gap-edge') {
     html += `<span class="tag tag-tf">📌 SL = Gap-Kante</span>`;
   } else {
-    html += `<span class="tag tag-tf">SL ${p.slPct}%</span>`;
+    html += `<span class="tag tag-tf">SL ${p.slPct ?? 1}%</span>`;
+  }
+  if (p.tpPct) {
+    html += `<span class="tag tag-tf">TP ${p.tpPct}%</span>`;
   }
 
   // Warnings
