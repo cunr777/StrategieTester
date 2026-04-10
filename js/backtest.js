@@ -182,6 +182,17 @@ const BacktestEngine = (() => {
       }
     }
 
+    else if (rule.type === 'always') {
+      // Kein Indikator — jeden Kerzenabschluss als Signal werten
+      // Bullish Kerze → long, Bearish → short
+      for (let i = 1; i < candles.length; i++) {
+        const bull = candles[i].close > candles[i].open;
+        const bear = candles[i].close < candles[i].open;
+        if (bull && directions.includes('long'))  signals[i] = 'long';
+        if (bear && directions.includes('short')) signals[i] = 'short';
+      }
+    }
+
     // Filter by allowed directions
     return signals.map(s => s && directions.includes(s) ? s : null);
   }

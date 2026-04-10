@@ -43,7 +43,8 @@
     <textarea
       id="strategy-input"
       class="strategy-textarea"
-      placeholder="Beispiele:
+      placeholder="Beispiele (Indikator ist optional!):
+• Kaufe Bitcoin long, SL 1%, TP 3%, 4h Chart. (kein Indikator → FVG-Preis-Action wird genutzt)
 • Kaufe Bitcoin long wenn der RSI unter 30 fällt. Stop Loss bei 1%, Take Profit bei 3%.
 • Short ETHUSDT und SOLUSDT im 4h-Chart wenn EMA 50 EMA 200 von oben kreuzt.
 • Long alle Altcoins wenn MACD bullish crossover, 1h Timeframe, RR 1:2.
@@ -208,7 +209,8 @@ function updatePreview() {
     if (r.type === 'macd')     html += `<span class="tag tag-long">MACD ${r.signal}</span>`;
     if (r.type === 'bb')       html += `<span class="tag tag-long">BB ${r.touch}</span>`;
     if (r.type === 'pattern')  html += `<span class="tag tag-long">📍 ${r.pattern}</span>`;
-    if (r.type === 'fvg')      html += `<span class="tag tag-long">🔷 FVG</span>`;
+    if (r.type === 'fvg')      html += `<span class="tag tag-long">🔷 FVG (Preis-Action)</span>`;
+    if (r.type === 'always')   html += `<span class="tag tag-long">⚡ Jede bullish/bearish Kerze</span>`;
   });
 
   // RR & SL

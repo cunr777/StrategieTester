@@ -218,9 +218,14 @@ const StrategyParser = (() => {
       ...extractPatterns(t),
     ];
 
+    // Kein Indikator → FVG / Preis-Action als Standard (kein Fehler)
     if (indicatorRules.length === 0) {
-      warnings.push('Kein erkannter Indikator / Einstiegssignal. Fallback: FVG-Strategie (Preis-Action).');
-      indicatorRules.push({ type: 'fvg', signal: directions[0] });
+      // Explizit Preis-Action / simple entry?
+      if (/\b(preis.?action|price.?action|breakout|ausbruch|momentum|trend|immer|always|every|jede)\b/.test(t)) {
+        indicatorRules.push({ type: 'always', signal: directions[0] });
+      } else {
+        indicatorRules.push({ type: 'fvg', signal: directions[0] });
+      }
     }
 
     return {
