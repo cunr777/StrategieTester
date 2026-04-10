@@ -199,7 +199,7 @@ const BacktestEngine = (() => {
 
   // ── Trade-Simulation ───────────────────────────────────────────
 
-  function simulateTrades(candles, signals, slPct, rrRatio) {
+  function simulateTrades(candles, signals, slPct, rrRatio, slMode, gapEdges) {
     const trades = [];
     let inTrade = false;
 
@@ -209,9 +209,18 @@ const BacktestEngine = (() => {
 
       const dir    = signals[i];
       const entry  = candles[i + 1].open; // enter next candle open
-      const sl     = dir === 'long'
-        ? entry * (1 - slPct / 100)
-        : entry * (1 + slPct / 100);
+
+      // SL: entweder Gap-Kante oder Prozent
+      let sl;
+      if (slMode === 'gap-edge' && gapEdges && gapEdges[i] != null) {
+        sl = gapEdges[i]; // tatsächliche FVG-Kante
+      } else {
+        const pct = slPct != null ? slPct : 1;
+        sl = dir === 'long'
+          ? entry * (1 - pct / 100)
+          : entry * (1 + pct / 100);
+      }
+
       const tp     = dir === 'long'
         ? entry + (entry - sl) * rrRatio
         : entry - (sl - entry) * rrRatio;
@@ -243,6 +252,20 @@ const BacktestEngine = (() => {
     return trades;
   }
 
+  // ── Gap-Kanten für SL berechnen ──────────────────────────────
+  function calcGapEdges(candles, directions) {
+    const edges = new Array(candles.length).fill(null);
+    for (let i = 2; i < candles.length; i++) {
+      const gapBull = candles[i].low  > candles[i-2].high;
+      const gapBear = candles[i].high < candles[i-2].low;
+      // Bullish FVG: SL = untere Kante des Gaps = candles[i-2].high
+      if (gapBull && directions.includes('long'))  edges[i] = candles[i-2].high;
+      // Bearish FVG: SL = obere Kante des Gaps = candles[i-2].low
+      if (gapBear && directions.includes('short')) edges[i] = candles[i-2].low;
+    }
+    return edges;
+  }
+
   // ── Haupt-Run-Funktion ─────────────────────────────────────────
 
   async function run(parsed, klines, onProgress) {
@@ -265,7 +288,12 @@ const BacktestEngine = (() => {
         }
       }
 
-      const trades = simulateTrades(data, combinedSignals, parsed.slPct, parsed.rr);
+      // Gap-Kanten vorberechnen (für slMode='gap-edge')
+      const gapEdges = parsed.slMode === 'gap-edge'
+        ? calcGapEdges(data, parsed.directions)
+        : null;
+
+      const trades = simulateTrades(data, combinedSignals, parsed.slPct, parsed.rr, parsed.slMode, gapEdges);
       trades.forEach(t => { t.symbol = sym; });
       allTrades.push(...trades);
     }

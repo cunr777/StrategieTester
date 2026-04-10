@@ -215,7 +215,11 @@ function updatePreview() {
 
   // RR & SL
   html += `<span class="tag tag-tf">RR 1:${p.rr}</span>`;
-  html += `<span class="tag tag-tf">SL ${p.slPct}%</span>`;
+  if (p.slMode === 'gap-edge') {
+    html += `<span class="tag tag-tf">📌 SL = Gap-Kante</span>`;
+  } else {
+    html += `<span class="tag tag-tf">SL ${p.slPct}%</span>`;
+  }
 
   // Warnings
   p.warnings.forEach(w => { html += `<br><span class="tag tag-warn">⚠ ${w}</span>`; });

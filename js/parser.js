@@ -191,6 +191,16 @@ const StrategyParser = (() => {
     return 2; // default 1:2
   }
 
+  function extractSLMode(raw) {
+    const t = raw.toLowerCase();
+    // "SL an die Kante", "Stop an Gap-Kante", "SL at gap edge", "Kante des Gaps", "gap edge", "untere Kante", "obere Kante"
+    if (/sl\s*(an|at|auf)\s*(die|the|der)?\s*(kante|edge|rand|grenze)/.test(t)) return 'gap-edge';
+    if (/(kante|edge|rand)\s*(des|of|vom)?\s*(gap|fvg|lücke)/.test(t))         return 'gap-edge';
+    if (/stop\s*(an|at|auf)\s*(die|the|der)?\s*(kante|edge)/.test(t))            return 'gap-edge';
+    if (/sl\s*(=|:)?\s*(gap|fvg|lücke)/.test(t))                               return 'gap-edge';
+    return 'percent';
+  }
+
   function extractSL(raw) {
     const m = raw.match(/sl\s*[=:]?\s*(\d+(?:\.\d+)?)%/i)
              || raw.match(/stop[\s-]?loss\s*[=:]?\s*(\d+(?:\.\d+)?)%/i);
@@ -208,7 +218,8 @@ const StrategyParser = (() => {
     const { symbols, mode } = extractSymbols(raw);
     const timeframe = extractTimeframe(t);
     const rr = extractRR(raw);
-    const slPct = extractSL(raw);
+    const slMode = extractSLMode(raw);
+    const slPct = slMode === 'gap-edge' ? null : extractSL(raw);
 
     const indicatorRules = [
       ...extractRSI(t),
@@ -236,6 +247,7 @@ const StrategyParser = (() => {
       indicatorRules,
       rr,
       slPct,
+      slMode,
       errors,
       warnings,
       raw,
