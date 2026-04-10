@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Anleitung — StrategieTester</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+  <style>
+    .info-section { display: flex; flex-direction: column; gap: 20px; }
+    .info-block { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 20px; }
+    .info-block h3 { font-size: 15px; font-weight: 700; margin-bottom: 12px; color: var(--accent); }
+    .info-block p, .info-block li { font-size: 13.5px; color: var(--muted); line-height: 1.7; }
+    .info-block ul { padding-left: 18px; }
+    .info-block li { margin-bottom: 4px; }
+    .example-box {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent);
+      border-radius: var(--radius);
+      padding: 12px 14px;
+      font-size: 13px;
+      color: var(--text);
+      margin-top: 12px;
+      line-height: 1.7;
+    }
+    .badge {
+      display: inline-block;
+      background: rgba(38,166,154,0.12);
+      color: var(--accent);
+      border: 1px solid rgba(38,166,154,0.3);
+      border-radius: 3px;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 1px 7px;
+      margin: 1px;
+    }
+    .badge.red { background: rgba(239,83,80,0.12); color: var(--red); border-color: rgba(239,83,80,0.3); }
+    .badge.yellow { background: rgba(240,185,11,0.12); color: var(--yellow); border-color: rgba(240,185,11,0.3); }
+  </style>
+</head>
+<body>
+<script>if (localStorage.getItem('theme') === 'light') document.body.classList.add('light');</script>
+
+<nav class="navbar">
+  <a class="logo" href="index.html">📊 <span>Strategie</span>Tester</a>
+  <div class="nav-links">
+    <a href="index.html">🧪 Tester</a>
+    <a href="info.html" class="active">📖 Anleitung</a>
+  </div>
+  <div class="navbar-right">
+    <button class="btn-theme" id="theme-toggle" onclick="toggleTheme()" title="Hell/Dunkel">🌙</button>
+  </div>
+</nav>
+
+<main class="main">
+  <div class="hero">
+    <h1>📖 <span>Anleitung</span></h1>
+    <p>So formulierst du deine Strategie, damit der Tester sie korrekt erkennt.</p>
+  </div>
+
+  <div class="info-section">
+
+    <div class="info-block">
+      <h3>🧠 Wie funktioniert der Parser?</h3>
+      <p>Du schreibst deine Strategie in freiem Text — auf Deutsch oder Englisch. Der Parser erkennt automatisch:</p>
+      <ul>
+        <li><strong>Richtung:</strong> Long / Short / Kaufen / Verkaufen</li>
+        <li><strong>Indikatoren:</strong> RSI, EMA-Cross, MACD, Bollinger Bands</li>
+        <li><strong>Candlestick-Muster:</strong> Hammer, Doji, Engulfing, Pinbar, Marubozu</li>
+        <li><strong>Währungen:</strong> Bitcoin, ETH, SOLUSDT, "alle Kryptos", Altcoins, …</li>
+        <li><strong>Timeframe:</strong> 15m, 1h, 4h, 1d, täglich, stündlich, …</li>
+        <li><strong>Risk/Reward:</strong> "RR 1:3", "1:2", "TP 3%", "SL 1%"</li>
+      </ul>
+    </div>
+
+    <div class="info-block">
+      <h3>✅ Beispiele (einfach kopieren)</h3>
+
+      <div class="example-box">
+        <span class="badge">RSI</span> Kaufe Bitcoin long wenn der RSI unter 30 fällt. Stop Loss 1%, Take Profit 3%.
+      </div>
+
+      <div class="example-box">
+        <span class="badge red">EMA Cross</span> Short ETHUSDT und SOLUSDT im 4h-Chart wenn EMA 50 EMA 200 von oben kreuzt. SL 1.5%, TP 3%.
+      </div>
+
+      <div class="example-box">
+        <span class="badge yellow">MACD</span> Long alle Altcoins wenn MACD bullish crossover, 1h Timeframe, RR 1:2.
+      </div>
+
+      <div class="example-box">
+        <span class="badge">Muster</span> Wenn ein Hammer-Kerze auf dem 1h Chart erscheint → long Entry, SL 1%, TP 2%.
+      </div>
+
+      <div class="example-box">
+        <span class="badge">Golden Cross</span> Golden Cross Strategie auf Bitcoin 1d. SL 3%, RR 1:3.
+      </div>
+
+      <div class="example-box">
+        <span class="badge red">Bollinger</span> Short wenn Preis das obere Bollinger Band berührt. BTCUSDT, 4h, SL 1%, TP 2%.
+      </div>
+    </div>
+
+    <div class="info-block">
+      <h3>📊 Unterstützte Indikatoren</h3>
+      <ul>
+        <li><strong>RSI:</strong> "RSI unter 30", "RSI &gt; 70", "oversold", "overbought"</li>
+        <li><strong>EMA-Crossover:</strong> "EMA 50 kreuzt EMA 200", "Golden Cross", "Death Cross"</li>
+        <li><strong>MACD:</strong> "MACD bullish", "MACD crosses up", "MACD bearish crossover"</li>
+        <li><strong>Bollinger Bands:</strong> "unteres BB", "upper band berührt", "BB unten"</li>
+        <li><strong>Candlestick:</strong> hammer, doji, engulfing, pinbar, marubozu, shooting star</li>
+        <li><strong>FVG (Fallback):</strong> wenn kein Indikator erkannt wird, wird Fair Value Gap genutzt</li>
+      </ul>
+    </div>
+
+    <div class="info-block">
+      <h3>🪙 Unterstützte Kryptowährungen</h3>
+      <p>Direkt namentlich: BTC, ETH, SOL, BNB, XRP, ADA, DOGE, AVAX, DOT, LINK, MATIC, LTC, UNI, PEPE, SHIB, NEAR, ATOM, FIL, AAVE, SUI, APT, ARB, OP, INJ …</p>
+      <p style="margin-top:8px">Oder als USDT-Pair: <strong>ETHUSDT</strong>, <strong>SOLUSDT</strong> etc.</p>
+      <p style="margin-top:8px">Für alle Kryptos: "alle Kryptos", "altcoins", "alle Währungen", "Watchlist" → nutzt Standard-Watchlist (10 Coins)</p>
+    </div>
+
+    <div class="info-block">
+      <h3>⚠️ Hinweise & Einschränkungen</h3>
+      <ul>
+        <li>Der Backtest nutzt <strong>Binance-Kerzendaten</strong> (öffentliche REST-API, kein Key nötig)</li>
+        <li>Trades werden mit simplem <strong>Entry am nächsten Kerzeneröffnung</strong> simuliert — kein Slippage</li>
+        <li>Kein Positionsmanagement: mehrere Signale können gleichzeitig aktiv sein</li>
+        <li>Ergebnisse sind historisch und <strong>keine Garantie</strong> für zukünftige Performance</li>
+        <li>Für viele Symbole dauert der Ladevorgang länger (Rate-Limit-Pause: 100ms/Symbol)</li>
+      </ul>
+    </div>
+
+  </div>
+</main>
+
+<script>
+function toggleTheme() {
+  const isLight = document.body.classList.toggle('light');
+  localStorage.setItem('theme', isLight ? 'light' : 'dark');
+  document.getElementById('theme-toggle').textContent = isLight ? '☀️' : '🌙';
+}
+if (document.body.classList.contains('light'))
+  document.getElementById('theme-toggle').textContent = '☀️';
+</script>
+</body>
+</html>

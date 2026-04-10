@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Strategie-Tester</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<!-- ── Theme restore ──────────────────────────────── -->
+<script>
+  if (localStorage.getItem('theme') === 'light') document.body.classList.add('light');
+</script>
+
+<!-- ── Navbar ─────────────────────────────────────── -->
+<nav class="navbar">
+  <a class="logo" href="index.html">📊 <span>Strategie</span>Tester</a>
+  <div class="nav-links">
+    <a href="index.html" class="active">🧪 Tester</a>
+    <a href="info.html">📖 Anleitung</a>
+  </div>
+  <div class="navbar-right">
+    <button class="btn-theme" id="theme-toggle" onclick="toggleTheme()" title="Hell/Dunkel">🌙</button>
+  </div>
+</nav>
+
+<!-- ── Main ───────────────────────────────────────── -->
+<main class="main">
+
+  <!-- Hero -->
+  <div class="hero">
+    <h1>KI-<span>Strategie</span>-Backtest</h1>
+    <p>Beschreibe deine Trading-Strategie in eigenen Worten — der Tester analysiert sie auf historischen Krypto-Daten und gibt dir Win-Rate, Return und jeden einzelnen Trade.</p>
+  </div>
+
+  <!-- Strategie-Eingabe -->
+  <div class="card">
+    <h2><span class="dot"></span>Strategie beschreiben</h2>
+    <textarea
+      id="strategy-input"
+      class="strategy-textarea"
+      placeholder="Beispiele:
+• Kaufe Bitcoin long wenn der RSI unter 30 fällt. Stop Loss bei 1%, Take Profit bei 3%.
+• Short ETHUSDT und SOLUSDT im 4h-Chart wenn EMA 50 EMA 200 von oben kreuzt.
+• Long alle Altcoins wenn MACD bullish crossover, 1h Timeframe, RR 1:2.
+• Engulfing-Kerze auf dem 1h Chart → long Entry, SL 1.5%, TP 3%."
+    ></textarea>
+
+    <!-- Erkannte Strategie Preview -->
+    <div class="parsed-preview" id="parsed-preview"></div>
+
+    <!-- Config-Zeile: Zeitraum & Timeframe Override -->
+    <div class="config-row">
+      <div class="form-group">
+        <label>Startdatum</label>
+        <input type="date" id="date-start" />
+      </div>
+      <div class="form-group">
+        <label>Enddatum</label>
+        <input type="date" id="date-end" />
+      </div>
+      <div class="form-group">
+        <label>Timeframe Override</label>
+        <select id="tf-override">
+          <option value="">Auto (aus Text)</option>
+          <option value="15m">15m</option>
+          <option value="1h">1h</option>
+          <option value="4h">4h</option>
+          <option value="1d">1d</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Max. Symbole</label>
+        <select id="max-symbols">
+          <option value="3">3</option>
+          <option value="5" selected>5</option>
+          <option value="10">10</option>
+          <option value="999">Alle</option>
+        </select>
+      </div>
+    </div>
+
+    <button class="btn-run" id="btn-run" onclick="runBacktest()">▶ Backtest starten</button>
+    <div class="log-box" id="log-box"></div>
+  </div>
+
+  <!-- Spinner -->
+  <div class="spinner-wrap" id="spinner">
+    <div class="spinner"></div>
+    <span id="spinner-text">Daten werden geladen…</span>
+  </div>
+
+  <!-- KPI-Karten -->
+  <div id="results-section" style="display:none; display:flex; flex-direction:column; gap:20px;">
+
+    <div class="kpi-grid" id="kpi-grid">
+      <div class="kpi-card"><div class="kpi-label">Total Return</div><div class="kpi-value" id="kpi-return">—</div></div>
+      <div class="kpi-card"><div class="kpi-label">Win-Rate</div><div class="kpi-value" id="kpi-winrate">—</div></div>
+      <div class="kpi-card"><div class="kpi-label">Trades gesamt</div><div class="kpi-value" id="kpi-trades">—</div></div>
+      <div class="kpi-card"><div class="kpi-label">Wins</div><div class="kpi-value green" id="kpi-wins">—</div></div>
+      <div class="kpi-card"><div class="kpi-label">Losses</div><div class="kpi-value red" id="kpi-losses">—</div></div>
+      <div class="kpi-card"><div class="kpi-label">Offen</div><div class="kpi-value" id="kpi-open">—</div></div>
+    </div>
+
+    <!-- Equity-Kurve -->
+    <div class="card">
+      <h2><span class="dot"></span>Equity-Kurve</h2>
+      <div class="chart-wrap">
+        <canvas id="equity-chart"></canvas>
+      </div>
+    </div>
+
+    <!-- Trade-Tabelle -->
+    <div class="card">
+      <h2><span class="dot"></span>Trade-Historie</h2>
+      <div class="trade-table-wrap">
+        <table class="trade-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Symbol</th>
+              <th>Richtung</th>
+              <th>Entry</th>
+              <th>SL</th>
+              <th>TP</th>
+              <th>Exit</th>
+              <th>P&amp;L %</th>
+              <th>Ergebnis</th>
+            </tr>
+          </thead>
+          <tbody id="trade-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Empty State (Start) -->
+  <div class="empty-state" id="empty-state">
+    <div class="icon">🔍</div>
+    Gib deine Strategie ein und klicke <strong>Backtest starten</strong>.
+  </div>
+
+</main>
+
+<!-- ── Scripts ────────────────────────────────────── -->
+<script src="js/parser.js"></script>
+<script src="js/binance.js"></script>
+<script src="js/backtest.js"></script>
+<script>
+
+// ── Theme ──────────────────────────────────────────
+function toggleTheme() {
+  const isLight = document.body.classList.toggle('light');
+  localStorage.setItem('theme', isLight ? 'light' : 'dark');
+  document.getElementById('theme-toggle').textContent = isLight ? '☀️' : '🌙';
+}
+if (document.body.classList.contains('light'))
+  document.getElementById('theme-toggle').textContent = '☀️';
+
+// ── Default-Daten ──────────────────────────────────
+(function setDefaultDates() {
+  const end   = new Date();
+  const start = new Date();
+  start.setMonth(start.getMonth() - 6);
+  document.getElementById('date-end').value   = end.toISOString().slice(0,10);
+  document.getElementById('date-start').value = start.toISOString().slice(0,10);
+})();
+
+// ── Live-Preview des Parsers ───────────────────────
+let _parseTimer;
+document.getElementById('strategy-input').addEventListener('input', () => {
+  clearTimeout(_parseTimer);
+  _parseTimer = setTimeout(updatePreview, 600);
+});
+
+function updatePreview() {
+  const raw = document.getElementById('strategy-input').value.trim();
+  const box = document.getElementById('parsed-preview');
+  if (!raw) { box.classList.remove('show'); return; }
+
+  const p = StrategyParser.parse(raw);
+  let html = '<strong>🔍 Erkannt:</strong> ';
+
+  // Richtung
+  p.directions.forEach(d => {
+    html += `<span class="tag ${d==='long'?'tag-long':'tag-short'}">${d==='long'?'▲ Long':'▼ Short'}</span>`;
+  });
+
+  // Symbole
+  if (p.symbolMode === 'watchlist') {
+    html += `<span class="tag tag-sym">🌐 ${p.symbols.length} Kryptos (Standard-Watchlist)</span>`;
+  } else {
+    p.symbols.forEach(s => { html += `<span class="tag tag-sym">${s}</span>`; });
+  }
+
+  // Timeframe
+  html += `<span class="tag tag-tf">⏱ ${p.timeframe}</span>`;
+
+  // Indikatoren
+  p.indicatorRules.forEach(r => {
+    if (r.type === 'rsi')      html += `<span class="tag tag-long">RSI ${r.op} ${r.val}</span>`;
+    if (r.type === 'emacross') html += `<span class="tag tag-long">EMA ${r.fast}×${r.slow} Cross</span>`;
+    if (r.type === 'macd')     html += `<span class="tag tag-long">MACD ${r.signal}</span>`;
+    if (r.type === 'bb')       html += `<span class="tag tag-long">BB ${r.touch}</span>`;
+    if (r.type === 'pattern')  html += `<span class="tag tag-long">📍 ${r.pattern}</span>`;
+    if (r.type === 'fvg')      html += `<span class="tag tag-long">🔷 FVG</span>`;
+  });
+
+  // RR & SL
+  html += `<span class="tag tag-tf">RR 1:${p.rr}</span>`;
+  html += `<span class="tag tag-tf">SL ${p.slPct}%</span>`;
+
+  // Warnings
+  p.warnings.forEach(w => { html += `<br><span class="tag tag-warn">⚠ ${w}</span>`; });
+  p.errors.forEach(e =>   { html += `<br><span class="tag tag-err">✖ ${e}</span>`; });
+
+  box.innerHTML = html;
+  box.classList.add('show');
+}
+
+// ── Chart-Instanz ─────────────────────────────────
+let _equityChart = null;
+
+// ── Log-Hilfsfunktion ─────────────────────────────
+function log(msg) {
+  const box = document.getElementById('log-box');
+  box.classList.add('show');
+  box.innerHTML += msg + '<br>';
+  box.scrollTop = box.scrollHeight;
+  document.getElementById('spinner-text').textContent = msg;
+}
+
+// ── Backtest Runner ───────────────────────────────
+async function runBacktest() {
+  const raw = document.getElementById('strategy-input').value.trim();
+  if (!raw) { alert('Bitte zuerst eine Strategie eingeben!'); return; }
+
+  // Reset UI
+  document.getElementById('empty-state').style.display  = 'none';
+  document.getElementById('results-section').style.display = 'none';
+  document.getElementById('log-box').innerHTML = '';
+  document.getElementById('log-box').classList.remove('show');
+  document.getElementById('spinner').classList.add('show');
+  document.getElementById('btn-run').disabled = true;
+
+  try {
+    // 1. Parse
+    const parsed = StrategyParser.parse(raw);
+    updatePreview();
+
+    // Apply overrides
+    const tfOverride = document.getElementById('tf-override').value;
+    if (tfOverride) parsed.timeframe = tfOverride;
+
+    const maxSym = +document.getElementById('max-symbols').value;
+    if (parsed.symbols.length > maxSym) parsed.symbols = parsed.symbols.slice(0, maxSym);
+
+    // 2. Date range
+    const startDate = new Date(document.getElementById('date-start').value);
+    const endDate   = new Date(document.getElementById('date-end').value);
+    endDate.setHours(23,59,59,999);
+    const startTime = startDate.getTime();
+    const endTime   = endDate.getTime();
+
+    log(`📋 Strategie geparst: ${parsed.symbols.length} Symbol(e), TF=${parsed.timeframe}, RR=1:${parsed.rr}, SL=${parsed.slPct}%`);
+
+    // 3. Daten laden
+    const klines = await Binance.loadAll(parsed.symbols, parsed.timeframe, startTime, endTime, log);
+
+    // 4. Backtest
+    log('⚙️ Backtest läuft…');
+    const trades = await BacktestEngine.run(parsed, klines, log);
+    const kpis   = BacktestEngine.calcKPIs(trades);
+
+    log(`✅ Fertig — ${trades.length} Trades gefunden`);
+
+    // 5. Render
+    renderKPIs(kpis);
+    renderChart(kpis.curve);
+    renderTable(trades);
+
+    document.getElementById('results-section').style.display = 'flex';
+
+  } catch(err) {
+    log(`❌ Fehler: ${err.message}`);
+    console.error(err);
+  } finally {
+    document.getElementById('spinner').classList.remove('show');
+    document.getElementById('btn-run').disabled = false;
+  }
+}
+
+// ── KPI-Renderer ──────────────────────────────────
+function renderKPIs(k) {
+  const fmt = v => v.toFixed(2);
+  const retEl = document.getElementById('kpi-return');
+  retEl.textContent = (k.totalReturn >= 0 ? '+' : '') + fmt(k.totalReturn) + '%';
+  retEl.className = 'kpi-value ' + (k.totalReturn >= 0 ? 'green' : 'red');
+
+  const wrEl = document.getElementById('kpi-winrate');
+  wrEl.textContent = fmt(k.winRate) + '%';
+  wrEl.className = 'kpi-value ' + (k.winRate >= 50 ? 'green' : 'red');
+
+  document.getElementById('kpi-trades').textContent  = k.trades;
+  document.getElementById('kpi-wins').textContent    = k.wins;
+  document.getElementById('kpi-losses').textContent  = k.losses;
+  document.getElementById('kpi-open').textContent    = k.open;
+}
+
+// ── Chart-Renderer ────────────────────────────────
+function renderChart(curve) {
+  const ctx = document.getElementById('equity-chart').getContext('2d');
+  if (_equityChart) _equityChart.destroy();
+
+  const isLight = document.body.classList.contains('light');
+  const gridColor = isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.05)';
+  const textColor = isLight ? '#656d76' : '#8b949e';
+
+  const labels = curve.map((_, i) => i === 0 ? 'Start' : `T${i}`);
+  const color  = curve[curve.length-1] >= 100 ? '#26a69a' : '#ef5350';
+
+  _equityChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        data: curve,
+        borderColor: color,
+        backgroundColor: color + '18',
+        borderWidth: 2,
+        pointRadius: curve.length > 100 ? 0 : 3,
+        pointHoverRadius: 5,
+        fill: true,
+        tension: 0.3,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => `Equity: ${ctx.parsed.y.toFixed(2)}%`
+          }
+        }
+      },
+      scales: {
+        x: { display: false },
+        y: {
+          grid: { color: gridColor },
+          ticks: { color: textColor, callback: v => v.toFixed(0) + '%' }
+        }
+      }
+    }
+  });
+}
+
+// ── Tabellen-Renderer ─────────────────────────────
+function renderTable(trades) {
+  const tbody = document.getElementById('trade-tbody');
+  if (!trades.length) {
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:24px">Keine Trades gefunden. Strategie oder Zeitraum anpassen.</td></tr>';
+    return;
+  }
+
+  const fmt = (p, v) => {
+    if (v >= 1000)  return v.toFixed(2);
+    if (v >= 1)     return v.toFixed(4);
+    return v.toFixed(6);
+  };
+  const fmtDate = ts => new Date(ts * 1000).toLocaleDateString('de-DE');
+
+  tbody.innerHTML = trades
+    .sort((a,b) => b.entryTime - a.entryTime)
+    .map((t, i) => {
+      const resClass = t.result === 'win' ? 'win' : t.result === 'loss' ? 'loss' : '';
+      const resLabel = t.result === 'win' ? '✅ Win' : t.result === 'loss' ? '❌ Loss' : '⏳ Offen';
+      const pnlSign  = t.pnlPct >= 0 ? '+' : '';
+      return `<tr>
+        <td style="color:var(--muted)">${trades.length - i}</td>
+        <td><strong>${t.symbol}</strong></td>
+        <td class="${t.dir==='long'?'badge-long':'badge-short'}">${t.dir==='long'?'▲ Long':'▼ Short'}</td>
+        <td>${fmt(t.symbol, t.entry)}</td>
+        <td style="color:var(--red)">${fmt(t.symbol, t.sl)}</td>
+        <td style="color:var(--accent)">${fmt(t.symbol, t.tp)}</td>
+        <td>${fmt(t.symbol, t.exitPrice)}</td>
+        <td class="${resClass}">${pnlSign}${t.pnlPct.toFixed(2)}%</td>
+        <td class="${resClass}">${resLabel}</td>
+      </tr>`;
+    }).join('');
+}
+
+</script>
+</body>
+</html>
