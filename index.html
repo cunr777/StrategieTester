@@ -165,11 +165,9 @@ if (document.body.classList.contains('light'))
 
 // ── Default-Daten ──────────────────────────────────
 (function setDefaultDates() {
-  const end   = new Date();
-  const start = new Date();
-  start.setMonth(start.getMonth() - 6);
-  document.getElementById('date-end').value   = end.toISOString().slice(0,10);
-  document.getElementById('date-start').value = start.toISOString().slice(0,10);
+  // Enddatum = heute, Startdatum leer lassen
+  const end = new Date();
+  document.getElementById('date-end').value = end.toISOString().slice(0,10);
 })();
 
 // ── Live-Preview des Parsers ───────────────────────
@@ -276,11 +274,14 @@ async function runBacktest() {
     if (tfOverride) { parsed.timeframe = tfOverride; parsed.tfExplicit = true; }
 
     // 2. Date range
-    const startDate = new Date(document.getElementById('date-start').value);
-    const endDate   = new Date(document.getElementById('date-end').value);
+    const startVal  = document.getElementById('date-start').value;
+    const endVal    = document.getElementById('date-end').value;
+    const endDate   = endVal ? new Date(endVal) : new Date();
     endDate.setHours(23,59,59,999);
-    const startTime = startDate.getTime();
     const endTime   = endDate.getTime();
+    const startDate = startVal ? new Date(startVal) : new Date(endTime - 365 * 24 * 60 * 60 * 1000);
+    const startTime = startDate.getTime();
+    if (!startVal) log(`📅 Kein Startdatum angegeben — nutze letztes Jahr (${startDate.toLocaleDateString('de-DE')})`);
 
     // 3. Kein Timeframe angegeben → besten automatisch finden
     let bestKlines, bestTrades, bestKpis, bestTf;
