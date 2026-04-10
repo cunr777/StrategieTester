@@ -74,15 +74,7 @@
           <option value="1d">1d</option>
         </select>
       </div>
-      <div class="form-group">
-        <label>Anzahl Coins testen</label>
-        <select id="max-symbols" title="Wie viele Coins maximal getestet werden (relevant wenn 'alle Kryptos' angegeben)">
-          <option value="3">3 Coins</option>
-          <option value="5" selected>5 Coins</option>
-          <option value="10">10 Coins</option>
-          <option value="999">Alle</option>
-        </select>
-      </div>
+
     </div>
 
     <button class="btn-run" id="btn-run" onclick="runBacktest()">▶ Backtest starten</button>
@@ -274,9 +266,6 @@ async function runBacktest() {
     // Apply overrides
     const tfOverride = document.getElementById('tf-override').value;
     if (tfOverride) parsed.timeframe = tfOverride;
-
-    const maxSym = +document.getElementById('max-symbols').value;
-    if (parsed.symbols.length > maxSym) parsed.symbols = parsed.symbols.slice(0, maxSym);
 
     // 2. Date range
     const startDate = new Date(document.getElementById('date-start').value);
