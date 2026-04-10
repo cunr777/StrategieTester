@@ -8,6 +8,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/style.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
 </head>
 <body>
 
@@ -20,7 +21,8 @@
 <nav class="navbar">
   <a class="logo" href="index.html">📊 <span>Strategie</span>Tester</a>
   <div class="nav-links">
-    <a href="index.html" class="active">🧪 Tester</a>
+    <a href="index.html" class="active" id="tab-text-link">🧪 Tester</a>
+    <a href="javascript:void(0)" id="tab-yt-link" onclick="switchTab('yt')">📺 YouTube</a>
     <a href="info.html">📖 Anleitung</a>
   </div>
   <div class="navbar-right">
@@ -144,6 +146,122 @@
     Gib deine Strategie ein und klicke <strong>Backtest starten</strong>.
   </div>
 
+  <!-- Trade-Chart -->  
+  <div id="trade-chart-section" style="display:none">
+    <div class="card">
+      <h2><span class="dot" style="background:var(--accent)"></span>Trade-Chart <span id="trade-chart-symbol" style="font-size:13px;color:var(--muted);font-weight:400"></span></h2>
+      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap" id="trade-chart-symbols"></div>
+      <div id="trade-chart-container" style="border-radius:8px;overflow:hidden;background:var(--bg2)"></div>
+    </div>
+  </div>
+
+</main>
+
+<!-- ── YouTube Tab ────────────────────────────── -->
+<main class="main" id="tab-yt" style="display:none">
+
+  <div class="hero">
+    <h1>📺 YouTube-<span>Strategie</span>-Analyse</h1>
+    <p>Füge einen YouTube-Link ein — der Tester liest das Transkript, erkennt ob eine Trading-Strategie erklärt wird und führt direkt einen Backtest durch.</p>
+  </div>
+
+  <div class="card">
+    <h2><span class="dot"></span>YouTube-Link</h2>
+    <div style="display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap">
+      <input
+        type="url"
+        id="yt-url-input"
+        placeholder="https://www.youtube.com/watch?v=..."
+        style="flex:1;min-width:260px;padding:10px 14px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg2);color:var(--text);font-size:14px;font-family:inherit;outline:none"
+      />
+      <button class="btn-run" id="btn-yt" onclick="runYouTubeAnalysis()" style="white-space:nowrap">🔍 Analysieren</button>
+    </div>
+    <div class="log-box" id="yt-log-box" style="margin-top:12px"></div>
+  </div>
+
+  <div class="spinner-wrap" id="yt-spinner">
+    <div class="spinner"></div>
+    <span id="yt-spinner-text">Transkript wird geladen…</span>
+  </div>
+
+  <!-- Analyse-Ergebnis -->  
+  <div id="yt-analysis-result" style="display:none">
+    <div class="card" id="yt-no-strategy-card" style="display:none">
+      <h2><span class="dot" style="background:var(--red)"></span>❌ Keine Strategie gefunden</h2>
+      <p id="yt-no-strategy-msg" style="color:var(--muted);font-size:14px"></p>
+    </div>
+
+    <div id="yt-strategy-found" style="display:none">
+      <div class="card">
+        <h2><span class="dot" style="background:var(--accent)"></span>✅ Strategie erkannt</h2>
+        <p id="yt-strategy-summary" style="color:var(--muted);font-size:13.5px;line-height:1.6"></p>
+        <div style="margin-top:14px;padding:12px 16px;background:var(--bg3);border-radius:8px;border-left:3px solid var(--accent)">
+          <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Extrahierte Strategie</div>
+          <div id="yt-parsed-tags" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+        </div>
+
+        <div class="config-row" style="margin-top:14px">
+          <div class="form-group">
+            <label>Startdatum</label>
+            <input type="date" id="yt-date-start" />
+          </div>
+          <div class="form-group">
+            <label>Enddatum</label>
+            <input type="date" id="yt-date-end" />
+          </div>
+          <div class="form-group">
+            <label>Timeframe</label>
+            <select id="yt-tf-override">
+              <option value="">Auto</option>
+              <option value="15m">15m</option>
+              <option value="1h">1h</option>
+              <option value="4h">4h</option>
+              <option value="1d">1d</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn-run" id="btn-yt-backtest" onclick="runYouTubeBacktest()" style="margin-top:8px">▶ Backtest starten</button>
+        <div class="log-box" id="yt-bt-log" style="margin-top:12px"></div>
+      </div>
+
+      <div class="spinner-wrap" id="yt-bt-spinner">
+        <div class="spinner"></div>
+        <span id="yt-bt-spinner-text">Backtest läuft…</span>
+      </div>
+
+      <!-- KPI-Karten (YouTube) -->
+      <div id="yt-results-section" style="display:none;flex-direction:column;gap:20px">
+        <div class="kpi-grid" id="yt-kpi-grid">
+          <div class="kpi-card"><div class="kpi-label">Total Return</div><div class="kpi-value" id="yt-kpi-return">—</div></div>
+          <div class="kpi-card"><div class="kpi-label">Win-Rate</div><div class="kpi-value" id="yt-kpi-winrate">—</div></div>
+          <div class="kpi-card"><div class="kpi-label">Trades</div><div class="kpi-value" id="yt-kpi-trades">—</div></div>
+          <div class="kpi-card"><div class="kpi-label">Wins</div><div class="kpi-value green" id="yt-kpi-wins">—</div></div>
+          <div class="kpi-card"><div class="kpi-label">Losses</div><div class="kpi-value red" id="yt-kpi-losses">—</div></div>
+          <div class="kpi-card"><div class="kpi-label">Offen</div><div class="kpi-value" id="yt-kpi-open">—</div></div>
+        </div>
+        <div class="card">
+          <h2><span class="dot"></span>Equity-Kurve</h2>
+          <div class="chart-wrap"><canvas id="yt-equity-chart"></canvas></div>
+        </div>
+        <!-- Trade-Chart YouTube -->
+        <div class="card" id="yt-trade-chart-card" style="display:none">
+          <h2><span class="dot" style="background:var(--accent)"></span>Trade-Chart <span id="yt-trade-chart-symbol" style="font-size:13px;color:var(--muted);font-weight:400"></span></h2>
+          <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap" id="yt-chart-symbols"></div>
+          <div id="yt-trade-chart-container" style="border-radius:8px;overflow:hidden;background:var(--bg2)"></div>
+        </div>
+        <div class="card">
+          <h2><span class="dot"></span>Trade-Historie</h2>
+          <div class="trade-table-wrap">
+            <table class="trade-table">
+              <thead><tr><th>#</th><th>Symbol</th><th>Richtung</th><th>Entry</th><th>SL</th><th>TP</th><th>Exit</th><th>P&amp;L %</th><th>Ergebnis</th></tr></thead>
+              <tbody id="yt-trade-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </main>
 
 <!-- ── Scripts ────────────────────────────────────── -->
@@ -151,6 +269,8 @@
 <script src="js/binance.js"></script>
 <script src="js/backtest.js"></script>
 <script src="js/optimizer.js"></script>
+<script src="js/youtube.js"></script>
+<script src="js/trade-chart.js"></script>
 <script>
 
 // ── Theme ──────────────────────────────────────────
@@ -169,11 +289,27 @@ if (document.body.classList.contains('light'))
   document.getElementById('date-end').value = end.toISOString().slice(0,10);
 })();
 
-// ── Live-Preview des Parsers ───────────────────────
-
+// ── Tab-Switching ────────────────────────────────
+function switchTab(tab) {
+  const isYt = tab === 'yt';
+  document.getElementById('tab-text').style.display    = isYt ? 'none' : '';
+  document.getElementById('tab-yt').style.display      = isYt ? '' : 'none';
+  document.getElementById('tab-text-link').classList.toggle('active', !isYt);
+  document.getElementById('tab-yt-link').classList.toggle('active',  isYt);
+  if (isYt) {
+    const end = new Date();
+    document.getElementById('yt-date-end').value = end.toISOString().slice(0,10);
+  }
+}
+document.getElementById('tab-text-link').addEventListener('click', e => { e.preventDefault(); switchTab('text'); });
 
 // ── Chart-Instanz ─────────────────────────────────
 let _equityChart = null;
+let _ytEquityChart = null;
+let _currentKlines = null;
+let _currentTrades = null;
+let _ytCurrentKlines = null;
+let _ytCurrentTrades = null;
 
 // ── Log-Hilfsfunktion ─────────────────────────────
 function log(msg) {
@@ -254,10 +390,13 @@ async function runBacktest() {
     log(`✅ Fertig — ${trades.length} Trades auf ${parsed.timeframe}`);
 
     // 5. Render
+    _currentKlines = klines;
+    _currentTrades = trades;
     renderKPIs(kpis);
     renderChart(kpis.curve);
     renderTable(trades);
     document.getElementById('results-section').style.display = 'flex';
+    renderTradeChartSection(klines, trades, 'trade-chart-section', 'trade-chart-container', 'trade-chart-symbol', 'trade-chart-symbols');
 
     // 6. Optimierung im Hintergrund
     if (trades.length > 0) {
@@ -389,8 +528,8 @@ function renderSuggestions(suggestions, baseKPIs) {
 }
 
 // ── Tabellen-Renderer ─────────────────────────────
-function renderTable(trades) {
-  const tbody = document.getElementById('trade-tbody');
+function renderTable(trades, tbodyId) {
+  const tbody = document.getElementById(tbodyId || 'trade-tbody');
   if (!trades.length) {
     tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:24px">Keine Trades gefunden. Strategie oder Zeitraum anpassen.</td></tr>';
     return;
@@ -421,6 +560,277 @@ function renderTable(trades) {
         <td class="${resClass}">${resLabel}</td>
       </tr>`;
     }).join('');
+}
+
+// ── Trade-Chart Renderer ───────────────────────────
+function renderTradeChartSection(klines, trades, sectionId, containerId, labelId, symbolsId) {
+  if (!trades.length) return;
+
+  const section = document.getElementById(sectionId);
+  section.style.display = 'block';
+
+  // Alle verfügbaren Symbole ermitteln
+  const symbols = [...new Set(trades.map(t => t.symbol))].sort();
+
+  // Symbol-Buttons bauen
+  const symWrap = document.getElementById(symbolsId);
+  symWrap.innerHTML = symbols.map((s, i) =>
+    `<button onclick="showTradeChart(${JSON.stringify(klines)},${JSON.stringify(trades)},'${s}','${containerId}','${labelId}')"
+      style="padding:4px 10px;border-radius:6px;border:1.5px solid var(--border);background:${i===0?'var(--accent)':'var(--bg2)'};color:${i===0?'#fff':'var(--text)'};font-size:12px;cursor:pointer;font-family:inherit">${s}</button>`
+  ).join('');
+
+  // Ersten Chart gleich anzeigen
+  if (symbols.length > 0) showTradeChart(klines, trades, symbols[0], containerId, labelId);
+}
+
+function showTradeChart(klines, trades, symbol, containerId, labelId) {
+  document.getElementById(labelId).textContent = '— ' + symbol;
+  const candles = (klines[symbol] || []);
+  if (!candles.length) return;
+
+  // Container-ID als Chart-Key verwenden
+  const chartKey = containerId;
+  if (!window._tradeCharts) window._tradeCharts = {};
+
+  // Alten Chart zerstören
+  if (window._tradeCharts[chartKey]) {
+    window._tradeCharts[chartKey].remove();
+    window._tradeCharts[chartKey] = null;
+  }
+
+  const container = document.getElementById(containerId);
+  const isLight = document.body.classList.contains('light');
+
+  const chart = LightweightCharts.createChart(container, {
+    width: container.clientWidth,
+    height: 420,
+    layout: {
+      background: { color: isLight ? '#ffffff' : '#0d1117' },
+      textColor:  isLight ? '#1f2328' : '#e6edf3',
+    },
+    grid: {
+      vertLines: { color: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.04)' },
+      horzLines: { color: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.04)' },
+    },
+    crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+    rightPriceScale: { borderColor: isLight ? '#d0d7de' : '#30363d' },
+    timeScale: { borderColor: isLight ? '#d0d7de' : '#30363d', timeVisible: true, secondsVisible: false },
+  });
+
+  const candleSeries = chart.addCandlestickSeries({
+    upColor: '#26a69a', downColor: '#ef5350',
+    borderUpColor: '#26a69a', borderDownColor: '#ef5350',
+    wickUpColor: '#26a69a', wickDownColor: '#ef5350',
+  });
+
+  candleSeries.setData(candles.map(c => ({ time: c.time, open: c.open, high: c.high, low: c.low, close: c.close })));
+
+  // Trade-Marker für dieses Symbol
+  const symTrades = trades.filter(t => t.symbol === symbol);
+  const markers = [];
+  for (const t of symTrades) {
+    markers.push({
+      time: t.entryTime,
+      position: t.dir === 'long' ? 'belowBar' : 'aboveBar',
+      color: t.dir === 'long' ? '#26a69a' : '#ef5350',
+      shape: t.dir === 'long' ? 'arrowUp' : 'arrowDown',
+      text: t.dir === 'long' ? '▲ Long' : '▼ Short',
+      size: 1,
+    });
+    if (t.result !== 'open' && t.exitTime) {
+      markers.push({
+        time: t.exitTime,
+        position: t.result === 'win'
+          ? (t.dir === 'long' ? 'aboveBar' : 'belowBar')
+          : (t.dir === 'long' ? 'belowBar' : 'aboveBar'),
+        color: t.result === 'win' ? '#26a69a' : '#ef5350',
+        shape: 'circle',
+        text: t.result === 'win' ? '✓ Win' : '✗ Loss',
+        size: 0.8,
+      });
+    }
+  }
+  markers.sort((a,b) => a.time - b.time);
+  candleSeries.setMarkers(markers);
+  chart.timeScale().fitContent();
+
+  // Responsive
+  new ResizeObserver(() => chart.applyOptions({ width: container.clientWidth })).observe(container);
+  window._tradeCharts[chartKey] = chart;
+}
+
+// ── YouTube: Analyse ───────────────────────────────
+let _ytParsed = null;
+let _ytKlines = null;
+
+function ytLog(msg) {
+  const box = document.getElementById('yt-log-box');
+  box.classList.add('show');
+  box.innerHTML += msg + '<br>';
+  box.scrollTop = box.scrollHeight;
+  document.getElementById('yt-spinner-text').textContent = msg;
+}
+
+function ytBtLog(msg) {
+  const box = document.getElementById('yt-bt-log');
+  box.classList.add('show');
+  box.innerHTML += msg + '<br>';
+  box.scrollTop = box.scrollHeight;
+  document.getElementById('yt-bt-spinner-text').textContent = msg;
+}
+
+async function runYouTubeAnalysis() {
+  const url = document.getElementById('yt-url-input').value.trim();
+  if (!url) { alert('Bitte eine YouTube-URL eingeben!'); return; }
+
+  // Reset
+  document.getElementById('yt-log-box').innerHTML = '';
+  document.getElementById('yt-log-box').classList.remove('show');
+  document.getElementById('yt-analysis-result').style.display = 'none';
+  document.getElementById('yt-no-strategy-card').style.display = 'none';
+  document.getElementById('yt-strategy-found').style.display = 'none';
+  document.getElementById('yt-spinner').classList.add('show');
+  document.getElementById('btn-yt').disabled = true;
+  _ytParsed = null;
+
+  try {
+    // 1. Transkript holen
+    const { videoId, text } = await YouTubeTranscript.getTranscript(url, ytLog);
+
+    // 2. Strategie analysieren
+    ytLog('🧠 Analysiere Transkript auf Strategie-Inhalte…');
+    const analysis = YouTubeTranscript.analyzeTranscript(text);
+
+    document.getElementById('yt-analysis-result').style.display = 'block';
+
+    if (!analysis.hasStrategy) {
+      document.getElementById('yt-no-strategy-card').style.display = 'block';
+      document.getElementById('yt-no-strategy-msg').textContent = analysis.reason;
+      ytLog('❌ ' + analysis.reason);
+      return;
+    }
+
+    // 3. Strategie gefunden → parsen
+    ytLog('✅ ' + analysis.reason);
+    ytLog('🔍 Parse Strategie aus Text…');
+
+    const parsed = StrategyParser.parse(analysis.strategyText);
+    _ytParsed = parsed;
+
+    // Summary anzeigen
+    const summary = [
+      analysis.reason,
+      `Erkannte Richtung: ${parsed.directions.join(', ')}`,
+      `Symbole: ${parsed.symbols.slice(0,5).join(', ')}${parsed.symbols.length>5?'…':''}`,
+      `Timeframe: ${parsed.timeframe}`,
+      `RR: 1:${parsed.rr}  |  SL: ${parsed.slPct}%`,
+    ].join(' • ');
+    document.getElementById('yt-strategy-summary').textContent = summary;
+
+    // Tags
+    const tags = [];
+    parsed.directions.forEach(d => tags.push(`<span class="tag ${d==='long'?'tag-long':'tag-short'}">${d==='long'?'▲ Long':'▼ Short'}</span>`));
+    parsed.symbols.slice(0,6).forEach(s => tags.push(`<span class="tag tag-sym">${s}</span>`));
+    tags.push(`<span class="tag tag-tf">⏱ ${parsed.timeframe}</span>`);
+    tags.push(`<span class="tag tag-tf">RR 1:${parsed.rr}</span>`);
+    tags.push(`<span class="tag tag-tf">SL ${parsed.slPct}%</span>`);
+    parsed.indicatorRules.filter(r => r.type !== 'fvg' && r.type !== 'always').forEach(r => {
+      if (r.type === 'rsi')      tags.push(`<span class="tag tag-long">RSI ${r.op} ${r.val}</span>`);
+      if (r.type === 'emacross') tags.push(`<span class="tag tag-long">EMA ${r.fast}×${r.slow} Cross</span>`);
+      if (r.type === 'macd')     tags.push(`<span class="tag tag-long">MACD ${r.signal}</span>`);
+      if (r.type === 'bb')       tags.push(`<span class="tag tag-long">BB ${r.touch}</span>`);
+      if (r.type === 'pattern')  tags.push(`<span class="tag tag-long">${r.pattern}</span>`);
+    });
+    document.getElementById('yt-parsed-tags').innerHTML = tags.join('');
+
+    document.getElementById('yt-strategy-found').style.display = 'block';
+    ytLog('✅ Strategie bereit — klicke „Backtest starten“!');
+
+  } catch(err) {
+    ytLog('❌ ' + err.message);
+    document.getElementById('yt-analysis-result').style.display = 'block';
+    document.getElementById('yt-no-strategy-card').style.display = 'block';
+    document.getElementById('yt-no-strategy-msg').textContent = err.message;
+  } finally {
+    document.getElementById('yt-spinner').classList.remove('show');
+    document.getElementById('btn-yt').disabled = false;
+  }
+}
+
+// ── YouTube: Backtest ─────────────────────────────
+async function runYouTubeBacktest() {
+  if (!_ytParsed) { alert('Bitte zuerst analysieren!'); return; }
+
+  document.getElementById('yt-bt-log').innerHTML = '';
+  document.getElementById('yt-bt-log').classList.remove('show');
+  document.getElementById('yt-results-section').style.display = 'none';
+  document.getElementById('yt-bt-spinner').classList.add('show');
+  document.getElementById('btn-yt-backtest').disabled = true;
+
+  try {
+    const parsed = Object.assign({}, _ytParsed);
+    const tfOv = document.getElementById('yt-tf-override').value;
+    if (tfOv) { parsed.timeframe = tfOv; parsed.tfExplicit = true; }
+
+    const startVal = document.getElementById('yt-date-start').value;
+    const endVal   = document.getElementById('yt-date-end').value;
+    const endDate  = endVal ? new Date(endVal) : new Date();
+    endDate.setHours(23,59,59,999);
+    const endTime   = endDate.getTime();
+    const startDate = startVal ? new Date(startVal) : new Date(endTime - 365*24*60*60*1000);
+    const startTime = startDate.getTime();
+    if (!startVal) ytBtLog(`📅 Nutze letztes Jahr (${startDate.toLocaleDateString('de-DE')})`);
+
+    ytBtLog(`📊 Lade Daten für ${parsed.symbols.length} Symbol(e) auf ${parsed.timeframe}…`);
+    const klines = await Binance.loadAll(parsed.symbols, parsed.timeframe, startTime, endTime, ytBtLog);
+    ytBtLog('⚙️ Backtest läuft…');
+    const trades = await BacktestEngine.run(parsed, klines, ytBtLog);
+    const kpis   = BacktestEngine.calcKPIs(trades);
+    _ytKlines = klines;
+
+    ytBtLog(`✅ Fertig — ${trades.length} Trades`);
+
+    // KPIs
+    const fmt = v => v.toFixed(2);
+    const retEl = document.getElementById('yt-kpi-return');
+    retEl.textContent = (kpis.totalReturn >= 0 ? '+' : '') + fmt(kpis.totalReturn) + '%';
+    retEl.className = 'kpi-value ' + (kpis.totalReturn >= 0 ? 'green' : 'red');
+    const wrEl = document.getElementById('yt-kpi-winrate');
+    wrEl.textContent = fmt(kpis.winRate) + '%';
+    wrEl.className = 'kpi-value ' + (kpis.winRate >= 50 ? 'green' : 'red');
+    document.getElementById('yt-kpi-trades').textContent = kpis.trades;
+    document.getElementById('yt-kpi-wins').textContent   = kpis.wins;
+    document.getElementById('yt-kpi-losses').textContent = kpis.losses;
+    document.getElementById('yt-kpi-open').textContent   = kpis.open;
+
+    // Equity-Chart
+    const ytCtx = document.getElementById('yt-equity-chart').getContext('2d');
+    if (_ytEquityChart) _ytEquityChart.destroy();
+    const isLight = document.body.classList.contains('light');
+    const color = kpis.curve[kpis.curve.length-1] >= 100 ? '#26a69a' : '#ef5350';
+    _ytEquityChart = new Chart(ytCtx, {
+      type: 'line',
+      data: { labels: kpis.curve.map((_,i) => i===0?'Start':`T${i}`), datasets: [{ data: kpis.curve, borderColor: color, backgroundColor: color+'18', borderWidth:2, pointRadius: kpis.curve.length>100?0:3, fill:true, tension:0.3 }] },
+      options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{display:false} }, scales:{ x:{display:false}, y:{ grid:{color: isLight?'rgba(0,0,0,0.06)':'rgba(255,255,255,0.05)'}, ticks:{color: isLight?'#656d76':'#8b949e', callback: v => v.toFixed(0)+'%'} } } }
+    });
+
+    // Trade-Tabelle
+    renderTable(trades, 'yt-trade-tbody');
+
+    document.getElementById('yt-results-section').style.display = 'flex';
+
+    // Trade-Chart
+    const ytChartCard = document.getElementById('yt-trade-chart-card');
+    ytChartCard.style.display = 'block';
+    renderTradeChartSection(klines, trades, 'yt-trade-chart-card', 'yt-trade-chart-container', 'yt-trade-chart-symbol', 'yt-chart-symbols');
+
+  } catch(err) {
+    ytBtLog('❌ ' + err.message);
+    console.error(err);
+  } finally {
+    document.getElementById('yt-bt-spinner').classList.remove('show');
+    document.getElementById('btn-yt-backtest').disabled = false;
+  }
 }
 
 </script>
